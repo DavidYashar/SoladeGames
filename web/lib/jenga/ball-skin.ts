@@ -81,3 +81,25 @@ export function makeBallTexture(size = 1024): THREE.CanvasTexture {
   texture.anisotropy = 4;
   return texture;
 }
+
+/**
+ * A soft round contact shadow. Real lamp shadows are too diffuse on a bright cloth to
+ * read at gameplay distance, so the ball carries its own, drawn flat on the felt.
+ */
+export function makeShadowTexture(size = 256): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const r = size / 2;
+  const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, "rgba(0,0,0,0.92)");
+  grad.addColorStop(0.45, "rgba(0,0,0,0.6)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}

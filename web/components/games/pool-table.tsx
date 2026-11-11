@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import type { Mesh } from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
-import { makeBallTexture } from "@/lib/jenga/ball-skin";
+import { makeBallTexture, makeShadowTexture } from "@/lib/jenga/ball-skin";
 import { makeWoodTextures } from "@/lib/jenga/wood";
 
 /**
@@ -37,6 +37,7 @@ const BRICK_COLORS = ["#8a3a2c", "#9d4632", "#b0533a", "#c06343", "#cd7452"];
 
 /** A little larger than a real 57 mm ball, because true scale is a dot on screen. */
 const BALL_R = 0.042;
+const FELT_TOP = BED.y + 0.02;
 
 const HANDLER_X = 0.86;
 
@@ -116,6 +117,7 @@ function Handler() {
  * down under its own damping, which is enough to see the mechanic working.
  */
 function Ball({ bricks }: { bricks: BrickSpec[] }) {
+  const { camera, gl } = useThree();
   const mesh = useRef<Mesh>(null);
   const world = useRef<RAPIER.World | null>(null);
   const body = useRef<RAPIER.RigidBody | null>(null);
@@ -173,7 +175,7 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
 
       const b = w.createRigidBody(
         RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(0.42, BED.y + BALL_R, 0.3)
+          .setTranslation(0.42, FELT_TOP + BALL_R, 0.3)
           .setLinearDamping(0.22)
           .setAngularDamping(0.35)
           .setCcdEnabled(true),
@@ -225,12 +227,37 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       mesh.current.position.set(t.x, t.y, t.z);
       mesh.current.quaternion.set(r.x, r.y, r.z, r.w);
     }
+    if (shadow.current) {
+      // The blob sits on the cloth and tracks the ball, spreading as the ball lifts.
+      const lift = Math.max(0, t.y - (FELT_TOP + BALL_R));
+      const spread = 1 + lift * 0.5;
+      shadow.current.position.set(t.x, FELT_TOP + 0.002, t.z);
+      shadow.current.scale.set(spread, 1, spread);
+    }
   });
 
   const skin = useMemo(() => makeBallTexture(), []);
 
+  // Test hook: where the ball is on screen, so a capture can follow it.
+  useEffect(() => {
+    (window as unknown as { __ballScreen?: () => { x: number; y: number } | null }).__ballScreen =
+      () => {
+        const m = mesh.current;
+        if (!m) return null;
+        const v = m.position.clone().project(camera);
+        const rect = gl.domElement.getBoundingClientRect();
+        return {
+          x: rect.left + ((v.x + 1) / 2) * rect.width,
+          y: rect.top + ((1 - v.y) / 2) * rect.height,
+        };
+      };
+  }, [camera, gl]);
+  const shadowTex = useMemo(() => makeShadowTexture(), []);
+  const shadow = useRef<Mesh>(null);
+
   return (
-    <mesh ref={mesh} position={[0.42, BED.y + BALL_R, 0.3]} castShadow receiveShadow>
+    <>
+      <mesh ref={mesh} position={[0.42, BED.y + BALL_R, 0.3]} castShadow receiveShadow>
       <sphereGeometry args={[BALL_R, 96, 64]} />
       <meshPhysicalMaterial
         map={skin}
@@ -241,7 +268,24 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
         clearcoatRoughness={0.08}
         envMapIntensity={1.2}
       />
-    </mesh>
+      </mesh>
+
+      {/* Contact shadow as a sibling, so the ball's own transform cannot move it. */}
+      <mesh
+        ref={shadow}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0.42, BED.y + 0.003, 0.3]}
+      >
+        <planeGeometry args={[BALL_R * 4.6, BALL_R * 4.6]} />
+        <meshBasicMaterial
+          map={shadowTex}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </>
   );
 }
 
