@@ -1,0 +1,10 @@
+# Foundry build artifacts
+contracts/out/
+contracts/cache/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+
+# Local npm logs
+npm-debug.log*

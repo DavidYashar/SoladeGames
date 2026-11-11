@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARC-ADE — Arcade Economy &amp; NFT Game Theory Plan</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2333; --border: #2d3648;
+    --text: #e6edf3; --muted: #9aa7b8; --accent: #58a6ff; --accent-2: #79c0ff;
+    --green: #3fb950; --yellow: #d29922; --purple: #bc8cff; --red: #f85149;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 20px 80px; }
+  header.hero { text-align: center; padding: 56px 20px 40px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+  .hero .tag {
+    display: inline-block; background: rgba(88,166,255,.12); color: var(--accent-2);
+    border: 1px solid rgba(88,166,255,.35); padding: 4px 14px; border-radius: 999px;
+    font-size: 13px; letter-spacing: .04em; margin-bottom: 18px;
+  }
+  h1 { font-size: 38px; margin: 0 0 12px; font-weight: 800; letter-spacing: -.02em; }
+  .hero p.sub { color: var(--muted); font-size: 18px; max-width: 700px; margin: 0 auto; }
+  h2 { font-size: 25px; margin: 50px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h2 .num { color: var(--accent); margin-right: 10px; }
+  h3 { font-size: 18px; margin: 24px 0 8px; }
+  h4 { font-size: 15px; margin: 18px 0 6px; color: var(--accent-2); }
+  p, li { color: var(--text); }
+  ul, ol { padding-left: 22px; } li { margin: 5px 0; }
+  a { color: var(--accent); }
+  strong { color: var(--text); }
+  .muted { color: var(--muted); }
+  code { background: rgba(139,160,188,.15); padding: 1px 6px; border-radius: 5px; font-size: 13.5px; }
+  pre.formula {
+    background: #0a0e14; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; overflow-x: auto; margin: 14px 0; font-size: 14px; line-height: 1.5;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; margin: 14px 0;
+  }
+  .callout {
+    background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.3);
+    border-radius: var(--radius); padding: 16px 18px; margin: 18px 0;
+  }
+  .callout.green { background: rgba(63,185,80,.08); border-color: rgba(63,185,80,.32); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 700px) { .grid2, .grid4 { grid-template-columns: 1fr; } }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.green { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.4); }
+  .pill.yellow { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.4); }
+  .pill.blue { background: rgba(88,166,255,.12); color: var(--accent-2); border: 1px solid rgba(88,166,255,.35); }
+  .pill.purple { background: rgba(188,140,255,.15); color: var(--purple); border: 1px solid rgba(188,140,255,.4); }
+  .pill.red { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.4); }
+  .step {
+    display: flex; gap: 14px; align-items: flex-start; margin: 12px 0;
+  }
+  .step .n {
+    flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(88,166,255,.14); border: 1px solid rgba(88,166,255,.4);
+    color: var(--accent-2); display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .diagram-box {
+    background: #0a0e14; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; margin: 18px 0; overflow-x: auto;
+  }
+  .diagram-note { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  footer { text-align: center; color: var(--muted); font-size: 14px; margin-top: 60px; }
+  .muted-note { color: var(--muted); font-size: 13.5px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <span class="tag">STRATEGY DOCUMENT · TESTNET SEASON</span>
+  <h1>ARC-ADE</h1>
+  <p class="sub">Arcade economy &amp; NFT game theory — testnet season, whitelist campaign, paid tournaments, and the game-related NFT collection.</p>
+</header>
+
+<div class="wrap">
+
+  <h2><span class="num">1.</span>Executive Recommendation</h2>
+  <div class="callout">
+    <p class="muted">The strongest version of the idea:</p>
+    <p>Players practice and compete across <strong>four fair, deterministic games</strong>. Their verified season performance earns points. The top <strong>1,000 eligible wallets</strong> receive mint whitelist access. The NFT represents a <strong>machine in the arcade</strong> and unlocks identity, progression, access, and possible distributions tied to real game activity.</p>
+  </div>
+  <p>This is stronger than selling an NFT first and trying to create utility later.</p>
+  <p>The three product phases should be separate:</p>
+  <div class="grid2">
+    <div class="card"><span class="pill blue">Phase 1</span><h4>Testnet season</h4><p class="muted">Free gameplay, verified points, rankings, and whitelist qualification.</p></div>
+    <div class="card"><span class="pill purple">Phase 2</span><h4>NFT mint</h4><p class="muted">Qualified players mint game-related machine NFTs.</p></div>
+    <div class="card"><span class="pill green">Phase 3</span><h4>Live tournaments</h4><p class="muted">Players enter skill competitions with USDC, while prize pools, NFT holders, and the platform receive published shares.</p></div>
+  </div>
+  <p>The project should remain positioned as a <strong>skill arcade</strong>, not a casino or speculative play-to-earn token system.</p>
+
+  <h2><span class="num">2.</span>Proposed Product Model</h2>
+
+  <h3>2.1 Testnet season</h3>
+  <p>Players use the four current games:</p>
+  <div class="grid4">
+    <div class="card"><strong>Stack Tower</strong></div>
+    <div class="card"><strong>Brick Blitz</strong></div>
+    <div class="card"><strong>Bubble Pop</strong></div>
+    <div class="card"><strong>Neon Pinball</strong></div>
+  </div>
+  <p class="muted-note">(games can be changed, added or enhanced in quality or quantity over time)</p>
+  <p>Each game uses deterministic or date-seeded mechanics. The current game implementation already has game-specific seeds and local personal-best storage. For a real whitelist campaign, scores are not trusted from the browser: a signed score submission is validated and then recorded on-chain. <strong>The Smart Contract on ARC chain is the authoritative ledger for all points, scores, and season data</strong> — not the client.</p>
+  <p>Players earn a <strong>capped season score</strong>. At the end of the season:</p>
+  <ul>
+    <li>Take a published snapshot.</li>
+    <li>Rank eligible wallets.</li>
+    <li>Give the top <strong>1,000</strong> wallets guaranteed whitelist access.</li>
+    <li>Give ranks <strong>1,001–1,500</strong> reserve-list access.</li>
+    <li>Allow <strong>one mint per eligible wallet</strong> unless a later rule is explicitly announced.</li>
+  </ul>
+  <p class="muted">The reserve list prevents unused supply if some winners do not mint.</p>
+
+  <h3>2.2 NFT collection</h3>
+  <p>The collection should contain four machine identities related to the four games:</p>
+  <table>
+    <tr><th>Machine type</th><th>Related game</th></tr>
+    <tr><td>Tower Machine</td><td>Stack Tower</td></tr>
+    <tr><td>Brick Machine</td><td>Brick Blitz</td></tr>
+    <tr><td>Bubble Machine</td><td>Bubble Pop</td></tr>
+    <tr><td>Pinball Machine</td><td>Neon Pinball</td></tr>
+  </table>
+  <h4>Each NFT can contain</h4>
+  <ul>
+    <li>Machine type</li>
+    <li>Token number</li>
+    <li>Season earned</li>
+    <li>Founder or testnet provenance</li>
+    <li>Visual traits related to the game</li>
+    <li>Machine level</li>
+    <li>Usage history</li>
+    <li>Cosmetic rarity</li>
+  </ul>
+  <div class="callout green">
+    <p><strong>The narrative:</strong> You earned a machine by helping build the arcade. The machine becomes more useful and more interesting as the arcade is used, and earns through the tournament rewards and the XP you collect over time on your NFT.</p>
+  </div>
+  <p><span class="pill red">Guardrail</span> Avoid describing the NFT as guaranteed income or a guaranteed investment return.</p>
+
+  <h3>2.3 Paid tournaments</h3>
+  <p>A player pays a small USDC entry fee, plays the selected game under defined rules, and competes on a verified leaderboard.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart TB
+    E["Entry fee<br/>(0.10 USDC)"] --> SPLIT["Gross split (on-chain)"]
+    subgraph SPLIT["REVENUE SPLIT"]
+        P["60% → Prize pool"]
+        H["25% → Eligible NFT holders"]
+        PL["15% → Platform"]
+    end
+    P --> R1["1st 50%"]
+    P --> R2["2nd 25%"]
+    P --> R3["3rd 15%"]
+    </pre>
+    <p class="diagram-note">Prize pool distributed across multiple ranks, not one winner</p>
+  </div>
+  <p class="muted">This is a clean model, but the 60% prize pool should normally be distributed across multiple ranks rather than paid entirely to one player (first to third for instance). <span class="muted-note">(this can be discussed)</span></p>
+  <p class="muted">The exact distribution is a product decision. It should be published before the first paid tournament and encoded in the contract or settlement service.</p>
+
+  <h2><span class="num">3.</span>Whitelist Scoring</h2>
+
+  <h3>3.1 We do not use raw lifetime points</h3>
+  <p>A raw total score creates several problems:</p>
+  <ul>
+    <li>Players with more free time beat more skilled players.</li>
+    <li>One player can split activity across many wallets.</li>
+    <li>One game may be easier to farm than another.</li>
+    <li>Repeated play can inflate activity without proving skill.</li>
+    <li>Browser-local scores can be manipulated.</li>
+  </ul>
+  <p>The whitelist should use a <strong>capped, normalized season score</strong> instead.</p>
+
+  <h3>3.2 Recommended season-score formula</h3>
+  <pre class="formula">Season Score =
+  Verified Skill Score
++ Game Diversity Bonus
++ Tournament Participation
++ Improvement and Consistency
+- Abuse Penalties</pre>
+  <table>
+    <tr><th>Component</th><th>Weight</th></tr>
+    <tr><td>Verified skill performance</td><td>60%</td></tr>
+    <tr><td>Playing multiple games</td><td>15%</td></tr>
+    <tr><td>Tournament participation and placement</td><td>15%</td></tr>
+    <tr><td>Improvement and consistency</td><td>10%</td></tr>
+  </table>
+  <p class="muted">These percentages are starting points, not immutable rules.</p>
+
+  <h3>3.3 Normalized skill score</h3>
+  <p>Each game has its own normalized score from <strong>0 to 1,000</strong>. Raw scores are never compared across games.</p>
+  <p>A <strong>concrete, published formula</strong> is required so that any two people can reproduce the same number. The recommended shape is a percentile-style mapping, seeded with fixed reference scores so early-season values stay stable:</p>
+  <pre class="formula">normalized = 1000 * clamp( (playerScore - min) / (max - min), 0, 1 )</pre>
+  <ul>
+    <li><code>min</code> / <code>max</code> are published per game and updated at most once a season.</li>
+    <li>Seed them with fixed testnet reference scores, so a weak day never drifts a floor toward zero.</li>
+    <li>This is the single most important fairness surface; publish the exact numbers before the season snapshot.</li>
+  </ul>
+  <table>
+    <tr><th>Game</th><th>Normalization signals</th></tr>
+    <tr><td>Stack Tower</td><td>Height reached, perfect-drop rate, combo/streak</td></tr>
+    <tr><td>Brick Blitz</td><td>Wave reached, bricks destroyed, lives remaining</td></tr>
+    <tr><td>Bubble Pop</td><td>Bubbles cleared, shot efficiency, chain/combo</td></tr>
+    <tr><td>Neon Pinball</td><td>Score under fixed ball/lives/table rules</td></tr>
+  </table>
+  <p>The final skill score is the average of a player's best verified performance across games, subject to a <strong>minimum game-count requirement</strong>. A player cannot qualify through one game alone — at least 2–3 games must meet a minimum score threshold <span class="muted">(enforced by smart contract, on testnet before mint).</span></p>
+
+  <h3>3.4 Daily caps</h3>
+  <p>Use caps to make the leaderboard skill-oriented rather than time-oriented.</p>
+  <pre class="formula">Maximum qualifying points per game per day: 1,000
+Maximum qualifying points across all games per day: 3,000</pre>
+  <p class="muted">Players can continue to practice after reaching the cap, but extra play should not keep increasing whitelist rank indefinitely.</p>
+
+  <h3>3.5 Game diversity bonus</h3>
+  <table>
+    <tr><th>Participation</th><th>Example bonus</th></tr>
+    <tr><td>One game</td><td>0</td></tr>
+    <tr><td>Two games</td><td>+100</td></tr>
+    <tr><td>Three games</td><td>+250</td></tr>
+    <tr><td>Four games</td><td>+500</td></tr>
+  </table>
+  <p class="muted">The bonus should be capped and should not outweigh actual skill.</p>
+
+  <h3>3.6 Consistency and improvement</h3>
+  <p>Give limited points for:</p>
+  <ul>
+    <li>Playing on multiple separate days</li>
+    <li>Improving a verified personal best</li>
+    <li>Maintaining a daily puzzle streak</li>
+    <li>Returning during different season weeks</li>
+  </ul>
+  <p>These components are deliberately small (≈10%) and <strong>must never outweigh skill</strong>. The ranking is driven by capped, best verified performance — not by presence, frequency, or grind.</p>
+  <ul>
+    <li>Only the <strong>best verified performance per game per day</strong> counts toward the skill score.</li>
+    <li>Frequency rewards are capped and never compound indefinitely.</li>
+    <li>No points for repeated low-quality play; repetition beyond the daily cap does not raise rank.</li>
+  </ul>
+  <p class="muted">The objective is to build a habit, not to create a click farm.</p>
+
+  <h2><span class="num">4.</span>Make Tournaments More Challenging</h2>
+  <p>The basic tournament loop is good, but one score and one winner can become repetitive. The following mechanics add depth without introducing gambling-style randomness.</p>
+
+  <h3>4.1 Daily seeded challenge</h3>
+  <ul>
+    <li>Same board</li>
+    <li>Same starting conditions</li>
+    <li>Same game version</li>
+    <li>Same scoring rules</li>
+    <li>Same official attempt limit</li>
+  </ul>
+  <p class="muted">Free practice can remain unlimited, but only an official paid attempt should count toward the competitive leaderboard.</p>
+
+  <h3>4.2 Qualifier and final</h3>
+  <p>We use a two-stage event for special tournaments:</p>
+  <pre class="formula">Practice -&gt; Qualifier -&gt; Top 16 final -&gt; Winner</pre>
+  <ul>
+    <li>Entry fee: 0.10 USDC</li>
+    <li>One qualifying run</li>
+    <li>Top 16 advance</li>
+    <li>Final uses a second shared seed</li>
+    <li>Final winner determined by score</li>
+  </ul>
+  <p class="muted-note">(we can discuss about this)</p>
+
+  <h3>4.3 Challenge modes</h3>
+  <p>Create separate competitive modes for experienced players:</p>
+  <div class="card">
+    <span class="pill blue">Speed</span> <span class="pill purple">One-life</span> <span class="pill green">Precision</span> <span class="pill yellow">Hard seed</span> <span class="pill red">No-power-up</span> <span class="pill blue">Limited-time</span>
+  </div>
+  <p class="muted">Each mode should have its own leaderboard and published scoring rules.</p>
+
+  <h3>4.4 Weekly Grand Prix</h3>
+  <p>Daily tournaments create habit. Weekly championships create status.</p>
+  <ul>
+    <li>Players earn qualifying points during the week.</li>
+    <li>Top 64 enter the Sunday event.</li>
+    <li>Players compete in all four games.</li>
+    <li>The combined score determines the champion.</li>
+    <li>The winner receives the main prize and a permanent season badge.</li>
+  </ul>
+  <p class="muted">This encourages players to engage with the complete collection.</p>
+
+  <h3>4.5 Game rotation</h3>
+  <p>Rotate the featured game rather than letting Stack Tower host every event:</p>
+  <table>
+    <tr><th>Day</th><th>Featured game</th></tr>
+    <tr><td>Monday</td><td>Stack Tower</td></tr>
+    <tr><td>Tuesday</td><td>Brick Blitz</td></tr>
+    <tr><td>Wednesday</td><td>Bubble Pop</td></tr>
+    <tr><td>Thursday</td><td>Neon Pinball</td></tr>
+    <tr><td>Friday</td><td>Mixed challenge</td></tr>
+    <tr><td>Weekend</td><td>Grand Prix</td></tr>
+  </table>
+  <p class="muted-note">(can be changed, or use off-chain randomization for this. open to discussion.)</p>
+
+  <h2><span class="num">5.</span>NFT Game Theory</h2>
+
+  <h3>5.1 Four machine identities</h3>
+  <table>
+    <tr><th>Machine</th><th>Identity</th></tr>
+    <tr><td>Tower</td><td>Precision and timing</td></tr>
+    <tr><td>Brick</td><td>Waves, survival, and power-ups</td></tr>
+    <tr><td>Bubble</td><td>Efficiency and chain reactions</td></tr>
+    <tr><td>Pinball</td><td>Momentum, physics, and combo mastery</td></tr>
+  </table>
+  <p>NFT utility should primarily affect <strong>access, identity, cosmetics, progression, and prestige</strong>. It should never make the owner directly unbeatable in a paid competition, and no NFT benefit should be required to win.</p>
+  <div class="callout">
+    <p>A machine NFT is primarily a <strong>revenue-share and identity asset, not a competitive advantage</strong>. The 25% holder pool is a share of eligible game revenue, not a reward for skill or activity — holding a machine does not make its owner a better tournament player. Holder distributions must not be activated until competitive integrity has been proven in free tournaments (Stage D must precede Stage F).</p>
+  </div>
+
+  <h3>5.2 Collection completion bonus</h3>
+  <p>Holding one machine from each category can unlock:</p>
+  <div class="grid2">
+    <div class="card"><span class="pill purple">Founder badge</span></div>
+    <div class="card"><span class="pill blue">Cross-game tournament access</span></div>
+    <div class="card"><span class="pill green">Special weekly challenge</span></div>
+    <div class="card"><span class="pill yellow">Full arcade cabinet theme</span></div>
+    <div class="card"><span class="pill purple">Limited cosmetic set</span></div>
+    <div class="card"><span class="pill blue">Voting for future game themes</span></div>
+  </div>
+
+  <h3>5.3 Machine levels</h3>
+  <p>Machine XP needs a clear owner and attribution rule. Possible models:</p>
+  <ol>
+    <li>The machine earns XP when its owner plays. <span class="pill blue">ERC-6551 token-bound account</span></li>
+    <li>The machine earns XP whenever anyone plays its game.</li>
+    <li>The owner assigns the machine to one game for a season.</li>
+    <li>The NFT level is based on the historical usage of its game.</li>
+  </ol>
+  <div class="callout green">
+    <p><strong>Recommended model:</strong> An owner assigns a machine to one game for a season. The machine earns XP and benefits from that game's activity. The assignment has a cooldown or season lock.</p>
+  </div>
+  <p class="muted">This creates a meaningful choice without allowing constant switching.</p>
+
+  <h3>5.4 Commitment and lock periods</h3>
+  <p>A possible later mechanic is machine commitment:</p>
+  <table>
+    <tr><th>Lock period</th><th>Example share weight</th></tr>
+    <tr><td>No lock</td><td>1.00x</td></tr>
+    <tr><td>30 days</td><td>1.10x</td></tr>
+    <tr><td>90 days</td><td>1.25x</td></tr>
+    <tr><td>180 days</td><td>1.50x</td></tr>
+  </table>
+  <p class="muted">This creates a choice between liquidity and commitment. It must be reviewed legally and economically before launch and must never be described as guaranteed yield.</p>
+
+  <h2><span class="num">6.</span>Revenue Split Recommendation</h2>
+
+  <h3>6.1 Proposed arcade tournament split</h3>
+  <pre class="formula">60% prize pool
+25% NFT holder pool
+15% platform</pre>
+
+  <h3>6.2 Proposed paid arcade round split</h3>
+  <p>For the existing planned 0.10 USDC paid round:</p>
+  <pre class="formula">0.10 USDC per round
+25% NFT holders
+60% prize reserve or tournament funding
+15% platform</pre>
+  <p class="muted">The prize reserve can fund larger weekly events instead of producing insignificant payouts on every individual round.</p>
+
+  <h2><span class="num">7.</span>Recommended Launch Sequence</h2>
+
+  <div class="step"><div class="n">A</div><div><h4>Testnet foundation</h4><ul>
+    <li>Ensure testnet environment mirrors mainnet as closely as possible.</li>
+    <li>Validate all smart contract interactions on testnet before mainnet deployment.</li>
+    <li>Receive feedback from users and iterate on the testnet experience.</li>
+  </ul></div></div>
+
+  <div class="step"><div class="n">B</div><div><h4>Testnet leaderboard</h4><ul>
+    <li>Build the verified score ledger (on-chain smart contract authoritative records).</li>
+    <li>Calculate normalized scores from the published per-game formula.</li>
+    <li>Publish the full leaderboard methodology (normalization formula, caps, tie-break).</li>
+    <li>Add reserve list.</li>
+    <li>Run at least one dry-run snapshot.</li>
+    <li>Test score disputes and corrections.</li>
+  </ul></div></div>
+
+  <div class="step"><div class="n">C</div><div><h4>NFT mint</h4><ul>
+    <li>Deploy audited NFT contract. <span class="muted">(preferably using OpenSea and launchpad)</span></li>
+    <li>The minted NFT ID gets synced to its counter ERC-6551 account.</li>
+  </ul></div></div>
+
+  <div class="step"><div class="n">D</div><div><h4>Paid tournaments</h4><ul>
+    <li>Deploy arcade tournament contract. <span class="muted">(synced with NFT contract and the ERC-6551 accounts)</span></li>
+    <li>Implement the 60/25/15 split.</li>
+    <li>Add multi-rank prizes.</li>
+    <li>Add eligibility and geographic controls.</li>
+    <li>Add event monitoring.</li>
+    <li>Start with low limits and small entry amounts.</li>
+  </ul></div></div>
+
+  <h2><span class="num">8.</span>Tournaments at a Glance</h2>
+  <div class="card">
+    <ul>
+      <li>0.10 USDC standard entry</li>
+      <li>Same seeded challenge for all players</li>
+      <li>One clearly defined official score</li>
+      <li>Skill bands</li>
+      <li>60% prize pool</li>
+      <li>25% NFT holders</li>
+      <li>15% platform</li>
+      <li>Prize pool distributed across multiple ranks</li>
+      <li>Weekly Grand Prix for prestige</li>
+    </ul>
+  </div>
+
+  <h2><span class="num">9.</span>Product Philosophy</h2>
+  <div class="callout">
+    <p><strong>Build a fair game first, make ownership meaningful second, and connect distributions only to real activity that can be verified.</strong></p>
+  </div>
+  <p class="muted">That gives ARC-ADE a stronger identity than a generic NFT mint or a casino-style wagering app. It creates a progression from player to competitor to owner, while keeping the economic rules understandable and testable.</p>
+
+  <footer>ARC-ADE · Strategy Document · Derived from Arcade-Economy-and-NFT-Game-Theory.md</footer>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "dark", themeVariables: { fontFamily: "-apple-system, Segoe UI, Roboto, sans-serif" } });
+</script>
+
+</body>
+</html>

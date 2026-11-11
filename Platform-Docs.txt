@@ -1,0 +1,81 @@
+ARC-ADE — Platform Docs
+=========================
+
+A skill arcade hall on Arc. Practice free, compete in USDC, and own a slice of the hall.
+
+
+What is ARC-ADE?
+----------------
+ARC-ADE is an arcade of skill games on Arc, where every win is backed by real USDC that players paid in. Same seeded board for everyone, free practice always, and optional paid rounds for those who want to compete. All entries, splits, and payouts are recorded on-chain — nothing is printed from thin air.
+
+Play to get good, compete for the pot, and earn a machine of the arcade. Each machine is a share of the hall that grows as people play.
+
+
+How it works — play, earn, own
+------------------------------
+1. Practice free. Every machine runs a daily-seeded board that is identical for all players, so it's always about skill.
+2. Earn season points. Your best verified scores across the four games build a capped season score. Play multiple machines and show up on different days to earn more.
+3. Qualify for the mint. The top 1,000 eligible wallets at the season snapshot earn guaranteed whitelist access (ranks 1,001-1,500 get a reserve spot). One machine mint per wallet.
+4. Own a machine. Your NFT is one of four machine types tied to a game. It's an identity and revenue-share asset — not a way to buy your way to the top of a leaderboard.
+5. Compete for USDC. Enter paid tournaments. Prizes go to multiple ranks, slot pools are published, and nothing about the economy depends on a token inflating.
+
+
+Cabinet machines
+----------------
+Four machines, each with a daily-seeded board that is identical for every player. Each one also maps to a machine NFT type.
+
+- Stack Tower (Tower Machine) — Tap to drop. Perfect alignment keeps your width. Precision & timing.
+- Brick Blitz (Brick Machine) — Paddle breaker with seeded walls and combos. Waves, survival & power-ups.
+- Bubble Pop (Bubble Machine) — Aim, shoot, chain pops — the king of one more round. Efficiency & chain reactions.
+- Neon Pinball (Pinball Machine) — Real physics: flippers, bumpers, spin, and a plunger. Momentum, physics & combo mastery.
+
+
+Puzzle rail
+-----------
+A word, math, or logic puzzle each day (UTC). Play free and build streaks, or enter a paid league when the fee engine goes live. Puzzle answers are generated server-side and never shipped to the client.
+
+
+Tournaments
+-----------
+Pay a small USDC entry, play a daily-seeded board, and chase your best score. Prizes are paid to multiple ranks — not a single winner — and 60% of the pool goes to the winner split, 25% to machine NFT holders, and 15% to the platform. Skill bands (Rookie through Champion) keep new players competing with their own tier. A weekly Grand Prix across all four machines crowns a champion for prestige.
+
+
+How USDC moves
+--------------
+No game token. No emissions. USDC on Arc, split on-chain with published rules.
+
+- Per-round play: 0.10 USDC — 60% prize reserve · 25% NFT holders · 15% platform
+- Tournament entry: 0.10 USDC — 60% prize pool · 25% NFT holders · 15% platform
+- Puzzle leagues (when live): 0.10 / 0.50 / 1.00 — 60% winners · 25% League Seats · 15% platform (separate rail)
+
+Within the 60% prize pool, standard payout is 50% / 25% / 15% for 1st / 2nd / 3rd.
+
+
+Machine NFTs
+------------
+Each machine NFT is a claim on real play — you earn it, you don't buy it. Holders receive a share of eligible game revenue because the hall is in use, not because a token inflated.
+
+Four machine types, one per game:
+- Tower Machine — Stack Tower
+- Brick Machine — Brick Blitz
+- Bubble Machine — Bubble Pop
+- Pinball Machine — Neon Pinball
+
+A machine is a revenue-share and identity asset — never a competitive advantage. Assign a machine to one game each season to earn XP.
+
+
+Why this isn't P2E
+------------------
+- Same board — daily seed, identical machine for every player.
+- Skill, not chance — best score wins; free practice is unlimited.
+- Capped, normalized scoring — less time does not beat more skill.
+- USDC on Arc — entries and payouts are dollars, no emissions.
+- Machines are earned, never sold as a profit guarantee.
+
+
+Getting started
+---------------
+1. Connect your wallet (header, top right).
+2. Pick a machine and practice free.
+3. Fund USDC and compete when you're ready.
+4. Track your stats on your profile page.

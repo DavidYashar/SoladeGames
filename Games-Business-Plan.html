@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arc-Ade Games — Daily Puzzle League & Arcade King</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2333; --border: #2d3648;
+    --text: #e6edf3; --muted: #9aa7b8; --accent: #58a6ff; --accent-2: #79c0ff;
+    --green: #3fb950; --yellow: #d29922; --purple: #bc8cff; --red: #f85149;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 20px 80px; }
+  header.hero { text-align: center; padding: 56px 20px 40px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+  .hero .tag {
+    display: inline-block; background: rgba(88,166,255,.12); color: var(--accent-2);
+    border: 1px solid rgba(88,166,255,.35); padding: 4px 14px; border-radius: 999px;
+    font-size: 13px; letter-spacing: .04em; margin-bottom: 18px;
+  }
+  h1 { font-size: 38px; margin: 0 0 12px; font-weight: 800; letter-spacing: -.02em; }
+  .hero p.sub { color: var(--muted); font-size: 18px; max-width: 680px; margin: 0 auto; }
+  h2 { font-size: 25px; margin: 50px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h2 .num { color: var(--accent); margin-right: 10px; }
+  h3 { font-size: 18px; margin: 24px 0 8px; }
+  p, li { color: var(--text); }
+  ul, ol { padding-left: 22px; } li { margin: 5px 0; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; margin: 14px 0;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.green { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.4); }
+  .pill.yellow { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.4); }
+  .pill.blue { background: rgba(88,166,255,.12); color: var(--accent-2); border: 1px solid rgba(88,166,255,.35); }
+  .pill.purple { background: rgba(188,140,255,.15); color: var(--purple); border: 1px solid rgba(188,140,255,.4); }
+  .diagram-box {
+    background: #0a0e14; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px; margin: 18px 0; overflow-x: auto;
+  }
+  .diagram-note { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  footer { text-align: center; color: var(--muted); font-size: 14px; margin-top: 60px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <span class="tag">PROJECT DESIGN · v1</span>
+  <h1>I-ARC Games</h1>
+  <p class="sub">Two computer-only games on Arc — <strong>Daily Puzzle League</strong> &amp; <strong>Arcade King</strong> — where playing generates real USDC revenue that flows to players, NFT holders, and the platform.</p>
+</header>
+
+<div class="wrap">
+
+  <h2><span class="num">1.</span>The Idea in One Picture</h2>
+  <p>Two simple games where <strong>playing generates real USDC revenue</strong>, and that revenue flows to <strong>players (prizes), NFT holders (passive income), and us (rake)</strong>. Every USDC paid out came from a USDC paid in — nothing is printed from thin air.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph Games["THE GAMES"]
+        P["Daily Puzzle League<br/>daily word/number/logic puzzles"]
+        A["Arcade King<br/>skill arcade games"]
+    end
+    subgraph Money["MONEY IN"]
+        E["Paid entries<br/>(0.01 - 1 USDC)"]
+        C["Cosmetics / boosters"]
+        S["Sponsorships"]
+    end
+    subgraph Split["REVENUE SPLIT (onchain, transparent)"]
+        W["60% → Prize pool<br/>(winners)"]
+        H["25% → NFT Holder pool<br/>(NFT holders, daily)"]
+        U["15% → Platform<br/>(us)"]
+    end
+    E --> W
+    E --> H
+    E --> U
+    C -->|50/50| H
+    C -->|50/50| U
+    S --> U
+    H --> N["NFT value grows<br/>with game revenue"]
+    W --> PL["Players earn<br/>by winning"]
+    N --> N
+    </pre>
+    <p class="diagram-note">The engine: real game revenue funds prizes, NFT yield, and the platform</p>
+  </div>
+  <p><strong>Why this works when every P2E game died:</strong> rewards are backed by real game revenue, denominated in <strong>USDC (stable dollars)</strong>, settled <strong>instantly on Arc</strong>. The NFT is a <strong>revenue claim</strong> — "own part of the arcade" — not a speculative jpeg.</p>
+
+  <h2><span class="num">2.</span>The Shared Revenue Engine</h2>
+  <table>
+    <tr><th>Source</th><th>Prize pool</th><th>NFT Holder pool</th><th>Platform (us)</th></tr>
+    <tr><td>Paid entries</td><td><strong>60%</strong></td><td><strong>25%</strong></td><td><strong>15%</strong></td></tr>
+    <tr><td>Cosmetics / boosters</td><td>—</td><td><strong>50%</strong></td><td><strong>50%</strong></td></tr>
+    <tr><td>Sponsorships</td><td>varies (quests)</td><td>—</td><td>majority</td></tr>
+  </table>
+  <ul>
+    <li>Everything settles in <strong>USDC on Arc</strong>: instant, sub-second, auditable onchain.</li>
+    <li>Unclaimed winnings earn yield via <strong>EarnKit</strong> while they wait.</li>
+    <li>~$0.004 avg fee → micro-entries (0.01 USDC) stay profitable.</li>
+  </ul>
+
+  <h2><span class="num">3.</span>Game 1 — Daily Puzzle League 🧩</h2>
+  <h3>Gameplay</h3>
+  <ul>
+    <li><strong>One puzzle per day, same for everyone.</strong> Resets at midnight UTC.</li>
+    <li><strong>Mixed puzzle types, rotating daily</strong> <span class="pill purple">LOCKED</span> — mixture keeps it fresh, never boring:
+      <ul>
+        <li>🔤 <strong>Word days</strong> — Wordle-style word guessing</li>
+        <li>🔢 <strong>Number days</strong> — math / number-sequence riddles</li>
+        <li>🧠 <strong>Logic days</strong> — pattern / logic grid puzzles</li>
+      </ul>
+    </li>
+    <li><strong>Free mode:</strong> everyone plays free → score + shareable score card (Wordle-style virality).</li>
+    <li><strong>Streaks &amp; XP:</strong> solve streaks → XP → free entries, badges, entry discounts.</li>
+    <li><strong>Weekly Championship</strong> and <strong>referral bonuses</strong> (5% of a friend's first entry, paid from our 15%).</li>
+  </ul>
+  <h3>Paid leagues</h3>
+  <table>
+    <tr><th>League</th><th>Entry</th><th>Prize split</th></tr>
+    <tr><td>Copper</td><td>0.10 USDC</td><td>60 / 25 / 15</td></tr>
+    <tr><td>Silver</td><td>0.50 USDC</td><td>same, deeper payout curve</td></tr>
+    <tr><td>Gold</td><td>1.00 USDC</td><td>same + weekly champion bonus</td></tr>
+  </table>
+  <h3>How users make money</h3>
+  <ol>
+    <li>Winning leagues — the direct prize, paid instantly in USDC</li>
+    <li>Streaks → free entries — consistency converts into free shots at prizes</li>
+    <li>Referrals — small % of friends' entries</li>
+    <li>Sponsor quests — brands sponsor puzzle days; quests pay micro-USDC</li>
+  </ol>
+  <h3>The NFT — League Seat <span class="pill blue">COLLECTION 1</span></h3>
+  <ul>
+    <li><strong>Fixed supply: 10,000 seats. Ever.</strong></li>
+    <li>Each seat = <strong>1/10,000 of the daily Holder pool</strong> (25% of entries + 50% of cosmetics).</li>
+    <li><strong>Tiers:</strong> 🥉 Bronze (standard share) · 🥈 Silver (2× share + 1 free entry/day) · 🥇 Gold (5× share + free gold entry + vote on puzzle themes).</li>
+    <li><strong>Upgrading burns lower seats</strong> → supply shrinks over time → scarcity grows.</li>
+    <li><strong>5% royalty</strong> on every resale → to us.</li>
+  </ul>
+  <table>
+    <tr><th>Daily league entries</th><th>Entry volume/day</th><th>Holder pool/day</th><th>Per-seat yield/yr</th><th>Implied seat value (10×)</th></tr>
+    <tr><td>1,000</td><td>100 USDC</td><td>25 USDC</td><td>~0.91 USDC</td><td>~9 USDC</td></tr>
+    <tr><td>10,000</td><td>1,000 USDC</td><td>250 USDC</td><td>~9.1 USDC</td><td>~91 USDC</td></tr>
+    <tr><td>100,000</td><td>10,000 USDC</td><td>2,500 USDC</td><td>~91 USDC</td><td>~910 USDC</td></tr>
+  </table>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart LR
+    D["Daily puzzle<br/>(rotating types)"] --> S["Solve + score"]
+    S --> F["Free mode<br/>score card share"]
+    S --> L["Paid league<br/>0.10 / 0.50 / 1 USDC"]
+    L --> P["Win → USDC prize<br/>instantly on Arc"]
+    S --> K["Streak + XP"]
+    K --> E["Free entries + badges"]
+    L --> H["25% → League Seat holders"]
+    H --> Y["Seat yield → seat value"]
+    </pre>
+    <p class="diagram-note">Daily Puzzle League loop</p>
+  </div>
+
+  <h2><span class="num">4.</span>Game 2 — Arcade King 🕹️</h2>
+  <h3>Gameplay</h3>
+  <ul>
+    <li><strong>Flagship game:</strong> one polished endless-runner / stacker with a daily challenge mode.</li>
+    <li><strong>Later:</strong> 2–3 mini-games (marble drop, memory, aim trainer).</li>
+    <li><strong>Free mode:</strong> unlimited play, leaderboards, daily challenge, score-clip sharing.</li>
+    <li><strong>Paid runs:</strong> 0.01–0.10 USDC per run — beat the daily top score to win.</li>
+    <li><strong>Daily Tournament:</strong> bracket entry (0.25 USDC), top scores split the pot. Weekend Grand Prix with a bigger pool.</li>
+    <li><strong>Skill-matching (Skillz-style):</strong> players in skill bands → everyone feels they can win.</li>
+  </ul>
+  <h3>How users make money</h3>
+  <ol>
+    <li>Paid runs &amp; tournaments — skill → cash, settled instantly</li>
+    <li>Daily leaderboard prizes — top free scores get small USDC from a sponsor pool</li>
+    <li>Streak bonuses — 7 days straight → bonus entry credit</li>
+    <li>Holding a Machine NFT — passive rake share</li>
+  </ol>
+  <h3>The NFT — Arcade Machine <span class="pill blue">COLLECTION 2</span></h3>
+  <ul>
+    <li><strong>Fixed supply: 5,000 machines.</strong> Each machine = <strong>1/5,000 of the Holder pool</strong>.</li>
+    <li><strong>Machine level:</strong> games played on a machine's "lobby" earn it XP → level up → owner perks (free daily entries, leaderboard nameplate). Leveling = visible growth of the asset.</li>
+    <li><strong>Rare variants:</strong> limited skins (e.g., 1/50 gold-plated, 3× share) as tournament prizes.</li>
+    <li><strong>Own-the-casino narrative:</strong> "I own machine #0421 — it pays me every day because people are playing."</li>
+  </ul>
+  <table>
+    <tr><th>Daily paid runs</th><th>Volume/day</th><th>Holder pool/day</th><th>Per-machine yield/yr</th><th>Implied machine value (10×)</th></tr>
+    <tr><td>5,000</td><td>250 USDC</td><td>62.5 USDC</td><td>~4.6 USDC</td><td>~46 USDC</td></tr>
+    <tr><td>50,000</td><td>2,500 USDC</td><td>625 USDC</td><td>~46 USDC</td><td>~456 USDC</td></tr>
+    <tr><td>500,000</td><td>25,000 USDC</td><td>6,250 USDC</td><td>~456 USDC</td><td>~4,560 USDC</td></tr>
+  </table>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart LR
+    G["Play arcade games<br/>(free or paid)"]
+    G --> F["Free: leaderboards<br/>+ daily challenge"]
+    G --> R["Paid runs 0.01-0.10<br/>+ tournaments 0.25"]
+    R --> W["Win → USDC<br/>instant payout"]
+    R --> H["25% → Machine holders"]
+    H --> Y["Machine yield → value"]
+    G --> X["XP → machine level<br/>+ owner perks"]
+    </pre>
+    <p class="diagram-note">Arcade King loop</p>
+  </div>
+
+  <h2><span class="num">5.</span>Why the NFTs Stay Valuable</h2>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart TB
+    N["NFT price"]
+    N --- Y["1. Yield anchor<br/>daily USDC flow = price floor"]
+    N --- S2["2. Scarcity<br/>fixed supply + upgrades burn supply"]
+    N --- U2["3. Utility<br/>free entries, voting, perks, prestige"]
+    N --- V["4. Narrative + royalties<br/>'own the arcade' + 5% resale fee"]
+    Y --- R2["Game revenue grows<br/>→ yield grows → price grows"]
+    </pre>
+    <p class="diagram-note">Four pillars of NFT value</p>
+  </div>
+
+  <h2><span class="num">6.</span>Why Arc</h2>
+  <table>
+    <tr><th>Need</th><th>Arc provides</th></tr>
+    <tr><td>Stable rewards</td><td>USDC — no token death spiral</td></tr>
+    <tr><td>Instant payout feedback</td><td>Sub-second finality</td></tr>
+    <tr><td>Micro-entries viable</td><td>~$0.004 avg fee, 18-decimal precision</td></tr>
+    <tr><td>Idle rewards earn</td><td>EarnKit yield on unclaimed winnings</td></tr>
+    <tr><td>Transparent split</td><td>Onchain, verifiable by anyone</td></tr>
+  </table>
+
+  <h2><span class="num">7.</span>Fairness &amp; Anti-Abuse</h2>
+  <ul>
+    <li>Server-side score verification; anti-bot captchas on paid entries</li>
+    <li>One entry per wallet per league; skill-band matching</li>
+    <li>Free tier always available; payouts only from entry fees (never our treasury)</li>
+    <li>Prize pools onchain and auditable</li>
+  </ul>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: { darkMode: true } });
+</script>
+</body>
+</html>
