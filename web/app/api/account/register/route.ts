@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { isAddress, verifyMessage } from "viem";
+import bs58 from "bs58";
+import nacl from "tweetnacl";
 
 import {
   REGISTER_SIGNATURE_TTL_MS,
@@ -8,6 +9,7 @@ import {
   checkUsername,
   normalizeUsername,
 } from "@/lib/account";
+import { isSolanaAddress } from "@/lib/solana";
 import { registerPlayer } from "@/lib/server/players";
 
 export const dynamic = "force-dynamic";
@@ -22,15 +24,16 @@ interface RegisterBody {
 /**
  * POST /api/account/register
  * Claims a handle for a wallet. The wallet must sign a message containing that exact
- * handle, which proves ownership without spending gas.
+ * handle, proving ownership without spending gas. Solana wallets sign raw bytes with
+ * Ed25519, so the signature arrives base58-encoded.
  */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as RegisterBody | null;
 
-  if (!body || typeof body.address !== "string" || !isAddress(body.address)) {
+  if (!body || typeof body.address !== "string" || !isSolanaAddress(body.address)) {
     return NextResponse.json({ error: "A valid wallet address is required." }, { status: 400 });
   }
-  if (typeof body.signature !== "string" || !body.signature.startsWith("0x")) {
+  if (typeof body.signature !== "string" || body.signature.length < 64) {
     return NextResponse.json({ error: "A wallet signature is required." }, { status: 400 });
   }
   if (typeof body.issuedAt !== "string") {
@@ -57,17 +60,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: check.error }, { status: 400 });
   }
   const handle = check.value;
-  const address = body.address.toLowerCase() as `0x${string}`;
+  const address = body.address;
 
   // The handle is inside the signed message, so a signature can never be replayed
   // to claim a different one.
   let signatureValid = false;
   try {
-    signatureValid = await verifyMessage({
-      address,
-      message: buildRegisterMessage(handle, body.issuedAt),
-      signature: body.signature as `0x${string}`,
-    });
+    signatureValid = nacl.sign.detached.verify(
+      new TextEncoder().encode(buildRegisterMessage(handle, body.issuedAt)),
+      bs58.decode(body.signature),
+      bs58.decode(address),
+    );
   } catch {
     signatureValid = false;
   }

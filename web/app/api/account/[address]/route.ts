@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isAddress } from "viem";
+import { isSolanaAddress } from "@/lib/solana";
 
 import type { ProfilePayload } from "@/lib/account";
 import { getBestScores, getPlayer, getPlayerResults, touchPlayer } from "@/lib/server/players";
@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { address } = await context.params;
 
-  if (!isAddress(address)) {
+  if (!isSolanaAddress(address)) {
     return NextResponse.json({ error: "Invalid address." }, { status: 400 });
   }
 

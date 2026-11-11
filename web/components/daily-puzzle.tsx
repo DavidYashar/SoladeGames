@@ -2,15 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useAccount, useSignMessage } from "wagmi";
-
 import { useStats } from "@/hooks/use-stats";
-import {
-  TIERS,
-  buildSolveMessage,
-  type LeagueStatus,
-  type PaidVerifyResult,
-} from "@/lib/leagues";
 import type { DailyPuzzle, VerifyResult } from "@/lib/puzzles/types";
 
 function formatTime(ms: number): string {
@@ -26,11 +18,7 @@ interface SolvedInfo {
 }
 
 /** Interactive daily puzzle: fetch → guess → verify → score card. */
-export function DailyPuzzle({
-  leagueStatus,
-}: {
-  leagueStatus?: LeagueStatus | null;
-}) {
+export function DailyPuzzle() {
   const [puzzle, setPuzzle] = useState<DailyPuzzle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,18 +35,6 @@ export function DailyPuzzle({
   const [startTime] = useState(() => Date.now());
   const [elapsed, setElapsed] = useState(0);
   const stats = useStats();
-
-  const { address } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-
-  // Paid-league context: the wallet has a live on-chain entry for today.
-  const tierEntry = leagueStatus?.enteredTier ?? null;
-  const paid = Boolean(
-    address &&
-      tierEntry != null &&
-      leagueStatus?.contractDeployed &&
-      !leagueStatus.tiers[tierEntry].settled,
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -89,60 +65,10 @@ export function DailyPuzzle({
     return () => clearInterval(id);
   }, [solvedInfo, revealed, startTime]);
 
-  // Paid leagues track attempts server-side — sync the dots on entry.
-  useEffect(() => {
-    if (!paid || !leagueStatus || tierEntry == null) return;
-    setAttempts(leagueStatus.tiers[tierEntry].attemptsUsed);
-  }, [paid, leagueStatus, tierEntry]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!puzzle || solvedInfo || revealed || busy || !answer.trim()) return;
 
-    // Paid-league path: signed, server-tracked verification.
-    if (paid && address && tierEntry != null) {
-      setBusy(true);
-      try {
-        const signature = await signMessageAsync({
-          message: buildSolveMessage(puzzle.date, tierEntry),
-        });
-        const res = await fetch("/api/leagues/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date: puzzle.date,
-            tier: tierEntry,
-            address,
-            signature,
-            answer: answer.trim(),
-          }),
-        });
-        const data = (await res.json()) as PaidVerifyResult;
-        if (data.correct) {
-          const timeMs = Date.now() - startTime;
-          const used = data.attemptsUsed ?? attempts + 1;
-          setSolvedInfo({ timeMs, attempts: used });
-          stats.recordSolve(puzzle.date, timeMs, used);
-          setMessage(
-            `${data.message ?? "Correct!"} ${TIERS[tierEntry].name} league — paid out at settle.`,
-          );
-        } else {
-          setAttempts(data.attemptsUsed ?? attempts + 1);
-          setMessage(data.message ?? "Not quite — try again.");
-        }
-      } catch (e) {
-        setMessage(
-          e instanceof Error && /reject/i.test(e.message)
-            ? "Signature rejected — verification cancelled."
-            : "Network error — please try again.",
-        );
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-
-    // Free path.
     setBusy(true);
     try {
       const res = await fetch("/api/puzzles/verify", {
@@ -174,7 +100,7 @@ export function DailyPuzzle({
   }
 
   async function handleReveal() {
-    if (!puzzle || busy || paid) return; // No reveals while entered in a paid league.
+    if (!puzzle || busy) return;
     setBusy(true);
     try {
       const res = await fetch("/api/puzzles/verify", {
@@ -197,7 +123,7 @@ export function DailyPuzzle({
     if (!solvedInfo) return;
     const text = `I solved today's I-market Games ${puzzle?.title ?? "puzzle"} in ${formatTime(
       solvedInfo.timeMs,
-    )} with ${solvedInfo.attempts} attempt${solvedInfo.attempts === 1 ? "" : "s"} — streak ${stats.currentStreak} 🔥 Play at I-market Games on Arc.`;
+    )} with ${solvedInfo.attempts} attempt${solvedInfo.attempts === 1 ? "" : "s"} — streak ${stats.currentStreak} 🔥 Play Arkade on Solana.`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -241,12 +167,6 @@ export function DailyPuzzle({
 
         <div className="p-5 sm:p-6">
           <p className="text-sm leading-relaxed text-zinc-400">{puzzle.blurb}</p>
-
-          {paid && tierEntry != null && (
-            <p className="mt-2 font-display text-[10px] uppercase tracking-[0.14em] text-[#22e0ff]">
-              ⚡ {TIERS[tierEntry].name} league — paid entry active
-            </p>
-          )}
 
           {data.kind === "word" && (
             <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -346,7 +266,7 @@ export function DailyPuzzle({
             </p>
           )}
 
-          {attempts >= puzzle.attemptsAllowed && !done && !revealed && !paid && (
+          {attempts >= puzzle.attemptsAllowed && !done && !revealed && (
             <div className="mt-4 text-center">
               <button
                 onClick={handleReveal}
@@ -422,9 +342,7 @@ export function DailyPuzzle({
         <p className="font-display text-center text-[10px] uppercase leading-relaxed tracking-[0.12em] text-zinc-600">
           {formatTime(elapsed * 1000)}
           {" · "}
-          {paid
-            ? "Paid league — attempts and winners tracked server-side."
-            : "Free mode — streaks save locally. Enter a league above for USDC prizes."}
+          Free mode: streaks save locally.
         </p>
       )}
     </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useBalance, useDisconnect } from "wagmi";
-import { formatUnits } from "viem";
+
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 import { ConnectWallet } from "@/components/connect-wallet";
 import { RobotMark } from "@/components/brand/arcade-logo";
@@ -10,7 +11,7 @@ import { ArcHeader } from "@/components/landing/arc-header";
 import { Footer } from "@/components/landing/footer";
 import { GridTunnel } from "@/components/landing/grid-tunnel";
 import { useStats } from "@/hooks/use-stats";
-import { clearWalletCache } from "@/lib/wallet";
+import { SOLANA_CLUSTER } from "@/lib/solana";
 
 const BEST_KEYS = [
   { label: "Stack Tower", key: "imarket:stack-tower:best" },
@@ -31,11 +32,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function ProfilePage() {
-  const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
-  const { data: balance } = useBalance({ address });
+  const { publicKey, connected, disconnect } = useWallet();
+  const { connection } = useConnection();
   const stats = useStats();
   const [bests, setBests] = useState<Record<string, number | null>>({});
+  const [sol, setSol] = useState<number | null>(null);
+
+  const address = publicKey?.toBase58();
 
   useEffect(() => {
     const out: Record<string, number | null> = {};
@@ -45,6 +48,25 @@ export default function ProfilePage() {
     }
     setBests(out);
   }, []);
+
+  useEffect(() => {
+    if (!publicKey) {
+      setSol(null);
+      return;
+    }
+    let cancelled = false;
+    void connection
+      .getBalance(publicKey)
+      .then((lamports) => {
+        if (!cancelled) setSol(lamports / LAMPORTS_PER_SOL);
+      })
+      .catch(() => {
+        if (!cancelled) setSol(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey, connection]);
 
   return (
     <div className="relative isolate min-h-screen bg-black text-zinc-50">
@@ -57,7 +79,7 @@ export default function ProfilePage() {
         </p>
         <h1 className="mt-2 text-4xl font-black">Profile</h1>
 
-        {!isConnected || !address ? (
+        {!connected || !address ? (
           <div className="relative mt-8 overflow-hidden rounded-sm border border-white/10 bg-white/[0.02] p-10 text-center">
             <RobotMark className="mx-auto h-16 w-auto text-white" />
             <p className="font-display mt-5 text-xs uppercase tracking-[0.24em] text-zinc-300">
@@ -79,13 +101,13 @@ export default function ProfilePage() {
             <div className={`rounded-xl bg-white/[0.03] p-6 ${NEON}`}>
               <p className="text-[10px] uppercase tracking-widest text-zinc-500">Wallet</p>
               <p className="mt-1 font-mono text-lg text-zinc-100">
-                {address.slice(0, 6)}…{address.slice(-4)}
+                {address.slice(0, 4)}…{address.slice(-4)}
               </p>
               <p className="mt-2 text-sm text-zinc-400">
-                Balance:{" "}
-                {balance
-                  ? `${formatUnits(balance.value, balance.decimals)} ${balance.symbol}`
-                  : "—"}
+                Balance: {sol != null ? `${sol.toFixed(3)} SOL` : "—"}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-widest text-zinc-600">
+                {SOLANA_CLUSTER}
               </p>
             </div>
 
@@ -114,10 +136,7 @@ export default function ProfilePage() {
             </div>
 
             <button
-              onClick={() => {
-                disconnect();
-                clearWalletCache();
-              }}
+              onClick={() => void disconnect()}
               className="rounded-lg bg-white/5 px-5 py-2.5 text-sm text-zinc-300 shadow-[0_0_0_1px_rgba(91,159,216,0.22),0_0_14px_-8px_rgba(91,159,216,0.4)] transition-all hover:text-[#a9d4f0] hover:shadow-[0_0_0_1px_rgba(91,159,216,0.5),0_0_18px_-8px_rgba(91,159,216,0.6)]"
             >
               Disconnect

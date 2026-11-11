@@ -10,7 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { useAccount, useSignMessage } from "wagmi";
+import { useWallet } from "@solana/wallet-adapter-react";
+import bs58 from "bs58";
 
 import {
   buildRegisterMessage,
@@ -24,7 +25,8 @@ export interface RegisterOutcome {
 }
 
 interface PlayerContextValue {
-  address?: `0x${string}`;
+  /** Base58 wallet address of the connected player, when there is one. */
+  address?: string;
   isConnected: boolean;
   player: PlayerAccount | null;
   /** True while the first account lookup for the current wallet is in flight. */
@@ -43,8 +45,9 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
  * read from here so a fresh registration is reflected everywhere at once.
  */
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const { address, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
+  const { publicKey, connected, signMessage } = useWallet();
+
+  const address = publicKey?.toBase58();
 
   const [player, setPlayer] = useState<PlayerAccount | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,7 +57,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Dev stand-in: `/api/dev/player` only answers under `next dev`, so this effect is
   // inert in a production build and the gate behaves exactly as it always did.
   useEffect(() => {
-    if (isConnected) {
+    if (connected) {
       setDevPlayer(null);
       return;
     }
@@ -72,7 +75,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isConnected]);
+  }, [connected]);
 
   const refresh = useCallback(async () => {
     if (!address) {
@@ -104,16 +107,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (rawUsername: string): Promise<RegisterOutcome> => {
       if (!address) return { ok: false, error: "Connect a wallet first." };
+      if (!signMessage) {
+        return { ok: false, error: "This wallet cannot sign messages." };
+      }
 
       // Normalise exactly the way the server does before signing.
       const username = normalizeUsername(rawUsername);
       const issuedAt = new Date().toISOString();
+      const message = buildRegisterMessage(username, issuedAt);
 
-      let signature: `0x${string}`;
+      let signature: string;
       try {
-        signature = await signMessageAsync({
-          message: buildRegisterMessage(username, issuedAt),
-        });
+        const bytes = await signMessage(new TextEncoder().encode(message));
+        signature = bs58.encode(bytes);
       } catch (err) {
         const rejected = err instanceof Error && /reject|denied|cancel/i.test(err.message);
         return { ok: false, error: rejected ? "Signature cancelled." : "Could not sign." };
@@ -136,15 +142,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: "Network error — please try again." };
       }
     },
-    [address, signMessageAsync],
+    [address, signMessage],
   );
 
-  const devActive = devPlayer !== null && !isConnected;
+  const devActive = devPlayer !== null && !connected;
 
   const value = useMemo<PlayerContextValue>(
     () => ({
-      address: address ?? (devPlayer?.address as `0x${string}` | undefined),
-      isConnected: isConnected || devActive,
+      address: address ?? devPlayer?.address,
+      isConnected: connected || devActive,
       player: player ?? devPlayer,
       // Only "loading" once we know which wallet we are waiting on.
       loading: Boolean(address) && (loading || lookupFor !== address),
@@ -155,7 +161,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }),
     [
       address,
-      isConnected,
+      connected,
       devActive,
       player,
       devPlayer,

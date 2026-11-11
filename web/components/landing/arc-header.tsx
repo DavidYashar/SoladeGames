@@ -44,7 +44,7 @@ export function ArcHeader() {
               <span className="block h-2 w-2 bg-[#22e0ff]" />
               <span className="block h-2 w-2 bg-[#22e0ff]" />
             </span>
-            Arc Testnet
+            Solana Devnet
           </span>
           <div className="hidden md:block">
             <ConnectWallet />
@@ -105,7 +105,7 @@ export function ArcHeader() {
           ))}
           <span className="mt-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
             <RobotMark className="h-4 w-auto text-white" />
-            Arc Testnet · Chain 5042002
+            Solana Devnet · cluster devnet
           </span>
           <div className="mt-3 flex w-full max-w-xs justify-center">
             <ConnectWallet side="top" />

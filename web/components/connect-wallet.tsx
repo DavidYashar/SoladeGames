@@ -1,32 +1,52 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { formatUnits } from "viem";
-import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { useEffect, useState } from "react";
 
-import { clearWalletCache } from "@/lib/wallet";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+
 import { usePlayer } from "@/components/player-provider";
+import { SOLANA_CLUSTER } from "@/lib/solana";
+
+function shortAddress(address: string): string {
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
 
 /** Minimal wallet widget. Connected = handle pill; hover/click shows brief details. */
 export function ConnectWallet({
   side = "bottom",
 }: { side?: "top" | "bottom" } = {}) {
-  const { address, isConnected } = useAccount();
-  const { connect } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { data: balance } = useBalance({ address });
+  const { publicKey, connected, disconnect } = useWallet();
+  const { connection } = useConnection();
+  const { setVisible } = useWalletModal();
   const { player } = usePlayer();
   const [open, setOpen] = useState(false);
+  const [sol, setSol] = useState<number | null>(null);
 
-  const handleDisconnect = () => {
-    setOpen(false);
-    disconnect();
-    clearWalletCache();
-  };
+  const address = publicKey?.toBase58();
 
-  if (isConnected && address) {
+  useEffect(() => {
+    if (!publicKey) {
+      setSol(null);
+      return;
+    }
+    let cancelled = false;
+    void connection
+      .getBalance(publicKey)
+      .then((lamports) => {
+        if (!cancelled) setSol(lamports / LAMPORTS_PER_SOL);
+      })
+      .catch(() => {
+        if (!cancelled) setSol(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey, connection]);
+
+  if (connected && address) {
     return (
       <div
         className="relative"
@@ -55,7 +75,7 @@ export function ConnectWallet({
 
         {open && (
           <div
-            className={`absolute right-0 z-50 w-60 rounded-sm border border-white/10 bg-black/95 p-4 backdrop-blur-xl motion-safe:animate-[menu-pop_0.18s_ease-out] ${
+            className={`absolute right-0 z-50 w-64 rounded-sm border border-white/10 bg-black/95 p-4 backdrop-blur-xl motion-safe:animate-[menu-pop_0.18s_ease-out] ${
               side === "top" ? "bottom-full mb-2" : "top-full mt-2"
             }`}
           >
@@ -69,14 +89,12 @@ export function ConnectWallet({
                 Not registered
               </p>
             )}
-            <p className="mt-1 font-mono text-xs text-zinc-400">
-              {address.slice(0, 6)}…{address.slice(-4)}
-            </p>
+            <p className="mt-1 font-mono text-xs text-zinc-400">{shortAddress(address)}</p>
             <p className="mt-2 text-sm text-zinc-400">
-              Balance:{" "}
-              {balance
-                ? `${formatUnits(balance.value, balance.decimals)} ${balance.symbol}`
-                : "—"}
+              Balance: {sol != null ? `${sol.toFixed(3)} SOL` : "—"}
+            </p>
+            <p className="font-display mt-1 text-[9px] uppercase tracking-[0.16em] text-zinc-600">
+              {SOLANA_CLUSTER}
             </p>
             <Link
               href="/profile"
@@ -85,7 +103,10 @@ export function ConnectWallet({
               View profile
             </Link>
             <button
-              onClick={handleDisconnect}
+              onClick={() => {
+                setOpen(false);
+                void disconnect();
+              }}
               className="mt-2 w-full rounded-sm border border-white/15 bg-white/[0.04] px-4 py-2 text-sm text-zinc-300 transition-colors hover:border-[#22e0ff]/50 hover:text-white"
             >
               Disconnect
@@ -97,10 +118,7 @@ export function ConnectWallet({
   }
 
   return (
-    <button
-      onClick={() => connect({ connector: injected() })}
-      className="arcade-btn arcade-btn-sm"
-    >
+    <button onClick={() => setVisible(true)} className="arcade-btn arcade-btn-sm">
       Connect Wallet
     </button>
   );

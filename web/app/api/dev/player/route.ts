@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { PublicKey } from "@solana/web3.js";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -10,7 +12,9 @@ export const dynamic = "force-dynamic";
  * answers 404 outside development, so a production deployment cannot be bypassed.
  */
 const DEV_PLAYER = {
-  address: "0x0000000000000000000000000000000000000de1",
+  // A valid 32-byte Solana address, derived rather than hand-written, so the same
+  // value works anywhere the app validates an address.
+  address: new PublicKey(new Uint8Array(32).fill(7)).toBase58(),
   username: "devplayer",
   createdAt: new Date(0).toISOString(),
   totalPoints: 0,

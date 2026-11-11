@@ -36,7 +36,7 @@ const SELECT_COLUMNS = `
 export async function getPlayer(address: string): Promise<PlayerAccount | null> {
   const rows = await sql<PlayerRow>(
     `SELECT ${SELECT_COLUMNS} FROM players WHERE address = $1`,
-    [address.toLowerCase()],
+    [address],
   );
   return rows.length > 0 ? toAccount(rows[0]) : null;
 }
@@ -57,7 +57,7 @@ export async function registerPlayer(
      VALUES ($1, $2)
      ON CONFLICT DO NOTHING
      RETURNING ${SELECT_COLUMNS}`,
-    [address.toLowerCase(), username],
+    [address, username],
   );
 
   if (rows.length > 0) return { ok: true, player: toAccount(rows[0]) };
@@ -69,7 +69,7 @@ export async function registerPlayer(
   );
   if (existingHandle.length > 0) {
     // Re-claiming your own handle is a no-op, not a conflict.
-    if (existingHandle[0].address.toLowerCase() === address.toLowerCase()) {
+    if (existingHandle[0].address === address) {
       const existing = await getPlayer(address);
       if (existing) return { ok: true, player: existing };
     }
@@ -84,7 +84,7 @@ export async function registerPlayer(
 
 export async function touchPlayer(address: string): Promise<void> {
   await sql(`UPDATE players SET last_seen_at = now() WHERE address = $1`, [
-    address.toLowerCase(),
+    address,
   ]);
 }
 
@@ -106,7 +106,7 @@ export async function getPlayerResults(
       WHERE r.address = $1
       ORDER BY t.day DESC, r.rank ASC
       LIMIT $2`,
-    [address.toLowerCase(), limit],
+    [address, limit],
   );
 
   return rows.map((r) => ({
@@ -129,7 +129,7 @@ export async function getBestScores(
       WHERE address = $1
       GROUP BY game_id
       ORDER BY game_id`,
-    [address.toLowerCase()],
+    [address],
   );
   return rows.map((r) => ({ gameId: r.game_id, score: Number(r.best) }));
 }

@@ -1,57 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-
-import { useAccount } from "wagmi";
 
 import { ArcadeWordmark, RobotMark } from "@/components/brand/arcade-logo";
 import { DailyPuzzle } from "@/components/daily-puzzle";
 import { CabinetMarquee } from "@/components/games/cabinet-marquee";
-import { LeaguePanel } from "@/components/league-panel";
 import { RequireAccount } from "@/components/require-account";
-import type { LeagueStatus } from "@/lib/leagues";
 import { dateKey } from "@/lib/puzzles/date";
 
 const STEPS = [
   { n: "01", label: "Same puzzle", body: "Everyone gets the same board at 00:00 UTC." },
   { n: "02", label: "One attempt", body: "Skill only — no retries, no paying for score." },
-  { n: "03", label: "Settle up", body: "Winners split the pot in USDC on Arc." },
+  {
+    n: "03",
+    label: "Fresh tomorrow",
+    body: "The board rotates at midnight UTC. Streaks carry over.",
+  },
 ] as const;
 
 export default function PlayPage() {
-  const { address } = useAccount();
-  const [status, setStatus] = useState<LeagueStatus | null>(null);
-  const [refresh, setRefresh] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const params = new URLSearchParams();
-      if (address) params.set("address", address);
-      try {
-        const res = await fetch(`/api/leagues/status?${params.toString()}`);
-        if (res.ok) {
-          const data = (await res.json()) as LeagueStatus;
-          if (!cancelled) setStatus(data);
-        }
-      } catch {
-        // Keep previous state.
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [address, refresh]);
-
-  const refreshStatus = useCallback(() => setRefresh((r) => r + 1), []);
-
   return (
     <div className="relative isolate flex min-h-dvh flex-1 flex-col bg-black text-zinc-50">
       <CabinetMarquee
         title="Daily Puzzle"
-        badge="League"
+        badge="Daily"
         date={dateKey()}
         subtitle="Same board for every player · resets 00:00 UTC"
       />
@@ -72,10 +44,8 @@ export default function PlayPage() {
           ))}
         </section>
 
-        <LeaguePanel status={status} onChanged={refreshStatus} />
-
         <RequireAccount title="the daily puzzle">
-          <DailyPuzzle leagueStatus={status} />
+          <DailyPuzzle />
         </RequireAccount>
 
         {/* Footer actions */}
@@ -87,7 +57,7 @@ export default function PlayPage() {
             href="/docs"
             className="font-display text-[10px] uppercase tracking-[0.16em] text-zinc-500 transition-colors hover:text-white"
           >
-            How the league works →
+            How the daily puzzle works →
           </Link>
         </section>
 
