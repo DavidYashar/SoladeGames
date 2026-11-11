@@ -52,7 +52,7 @@ function legalPlanks(sim: JengaSim) {
   });
 }
 
-function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => void }) {
+function Scene({ sim, onMatch, onCarry }: { sim: JengaSim; onMatch: (s: MatchState) => void; onCarry: (busy: boolean) => void }) {
   const { camera, raycaster, gl } = useThree();
 
   const meshes = useRef(new Map<number, Mesh>());
@@ -150,6 +150,7 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
     const onUp = () => {
       if (!carrying.current) return;
       carrying.current = false;
+      onCarry(false);
       dropHeld.current();
     };
 
@@ -179,6 +180,7 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
     rank: () => [] as unknown,
     heldScreen: () => null as { x: number; y: number } | null,
     heldRaw: () => ({} as unknown),
+    cameraPos: () => [] as number[],
   });
   debug.current.state = () => ({
     turn: match.current.turn,
@@ -188,6 +190,7 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
   debug.current.drop = (x, z, alongX) => dropHeld.current({ x, z, alongX });
   debug.current.rank = () => rankMoves(sim, 3);
   debug.current.heldRaw = () => ({ held: heldRef.current, placements: placementCount.current, phase: match.current.phase });
+  debug.current.cameraPos = () => camera.position.toArray().map((v) => Number(v.toFixed(3)));
   debug.current.heldScreen = () => {
     const h = heldRef.current;
     if (!h) return null;
@@ -328,9 +331,10 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
           onPointerDown={(event) => {
             event.stopPropagation();
             carrying.current = true;
+            onCarry(true);
           }}
         >
-          <boxGeometry args={[PLANK.l, PLANK.h, PLANK.w]} />
+          <boxGeometry args={[PLANK.l * 1.25, PLANK.h * 2.2, PLANK.w * 1.25]} />
           <meshStandardMaterial
             color={HELD}
             emissive="#2aa6d6"
@@ -357,6 +361,7 @@ export function StackTowerGame() {
   const [sim, setSim] = useState<JengaSim | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchState>({ turn: "player", phase: "pull", loser: null });
+  const [carryUi, setCarryUi] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -400,7 +405,7 @@ export function StackTowerGame() {
           />
           <directionalLight position={[-9, 6, -7]} intensity={0.45} color="#9fb6d4" />
 
-          <Scene sim={sim} onMatch={setMatch} />
+          <Scene sim={sim} onMatch={setMatch} onCarry={setCarryUi} />
 
           <mesh position={[0, -0.26, 0]} receiveShadow>
             <boxGeometry args={[26, 0.5, 26]} />
@@ -413,8 +418,9 @@ export function StackTowerGame() {
             minDistance={9}
             maxDistance={30}
             maxPolarAngle={Math.PI / 2.05}
+            enabled={!carryUi}
             mouseButtons={{
-              LEFT: undefined as unknown as THREE.MOUSE,
+              LEFT: THREE.MOUSE.ROTATE,
               MIDDLE: THREE.MOUSE.DOLLY,
               RIGHT: THREE.MOUSE.ROTATE,
             }}
@@ -458,8 +464,8 @@ export function StackTowerGame() {
                 ? "you lose"
                 : "you win"
               : match.phase === "place"
-                ? "press the plank · move · release to drop · R to rotate · right-drag to orbit"
-                : "click a plank to pull it · right-drag to orbit · the top layer is locked"}
+                ? "press the plank · move · release to drop · R to rotate · drag empty space to orbit"
+                : "click a plank to pull it · drag to orbit · the top layer is locked"}
           </p>
           {!sim && !error && (
             <p className="font-display mt-2 text-[10px] uppercase tracking-[0.16em] text-zinc-600">
