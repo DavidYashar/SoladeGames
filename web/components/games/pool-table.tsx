@@ -295,6 +295,9 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
 
       const w = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
       w.timestep = 1 / 120;
+      // Rapier predicts contacts up to 0.02 m ahead by default, which reads as the
+      // ball bouncing before it touches. 0.5 mm is below what the eye can catch.
+      w.integrationParameters.normalizedPredictionDistance = 0.0005;
 
       // Bed.
       w.createCollider(
@@ -313,10 +316,12 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
             .setRestitution(0.92),
         );
 
-      wall(BED.w / 2, 0.05, 0.02, 0, BED.y + 0.05, BED.d / 2);
-      wall(BED.w / 2, 0.05, 0.02, 0, BED.y + 0.05, -BED.d / 2);
-      wall(0.02, 0.05, BED.d / 2, BED.w / 2, BED.y + 0.05, 0);
-      wall(0.02, 0.05, BED.d / 2, -BED.w / 2, BED.y + 0.05, 0);
+      // Slabs sit outside the playing surface, so their inner faces are exactly the
+      // cushion faces the player sees.
+      wall(BED.w / 2, 0.05, 0.02, 0, BED.y + 0.05, BED.d / 2 + 0.02);
+      wall(BED.w / 2, 0.05, 0.02, 0, BED.y + 0.05, -(BED.d / 2 + 0.02));
+      wall(0.02, 0.05, BED.d / 2, BED.w / 2 + 0.02, BED.y + 0.05, 0);
+      wall(0.02, 0.05, BED.d / 2, -(BED.w / 2 + 0.02), BED.y + 0.05, 0);
 
       // Bricks, fixed for now: they will become destructible.
       for (const b of bricks) {
@@ -361,6 +366,15 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       }
       world.current = w;
       body.current = b;
+      (window as unknown as { __ballState?: () => unknown }).__ballState = () => {
+        const t = b.translation();
+        const v = b.linvel();
+        return { x: t.x, y: t.y, z: t.z, vx: v.x, vy: v.y, vz: v.z };
+      };
+      (window as unknown as { __launch?: (x: number, z: number) => void }).__launch = (
+        x: number,
+        z: number,
+      ) => b.setLinvel({ x, y: 0, z }, true);
     })();
 
     return () => {
