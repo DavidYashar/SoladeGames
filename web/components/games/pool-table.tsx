@@ -16,7 +16,7 @@ import { makeWoodTextures } from "@/lib/jenga/wood";
  * the way a player stands behind the break.
  */
 
-const BED = { w: 2.24, d: 1.12, y: 0.78 };
+const BED = { w: 2.24, d: 1.4, y: 0.78 };
 const RAIL = 0.1;
 const RAIL_H = 0.085;
 const CUSHION = 0.045;
@@ -116,7 +116,7 @@ export function PoolTable() {
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [2.1, 4.42, 0], fov: 42, near: 0.05, far: 60 }}
+        camera={{ position: [2.96, 4.3, 0], fov: 42, near: 0.05, far: 60 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
         onCreated={({ camera }) => camera.lookAt(0, BED.y + 0.02, 0)}
       >
