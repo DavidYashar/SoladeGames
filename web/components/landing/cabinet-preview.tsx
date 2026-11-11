@@ -8,6 +8,8 @@ type Kind = "tower" | "brick" | "bubble" | "pinball";
 interface CabinetProps {
   name: string;
   control: string;
+  /** Present only when the cabinet is playable today. */
+  route?: string;
   accent: Accent;
   kind: Kind;
   bestKey: string;
@@ -119,6 +121,7 @@ function PinballScene() {
 
 export function CabinetPreview({
   name,
+  route,
   control,
   accent,
   kind,
@@ -157,9 +160,15 @@ export function CabinetPreview({
 
       {/* Control deck */}
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-3">
-        <span className="rounded-md bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
-          3D rebuild
-        </span>
+        {route ? (
+          <span className="rounded-md bg-[#22e0ff]/15 px-2.5 py-1 text-[10px] font-semibold text-[#22e0ff]">
+            Play
+          </span>
+        ) : (
+          <span className="rounded-md bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-zinc-400">
+            3D rebuild
+          </span>
+        )}
         {best != null && (
           <span className="ml-auto text-[10px] text-zinc-500">
             Best{" "}

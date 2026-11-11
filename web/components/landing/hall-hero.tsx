@@ -1,8 +1,21 @@
+import Link from "next/link";
+
 import { CabinetPreview } from "./cabinet-preview";
 
-const CABINETS = [
+interface CabinetEntry {
+  name: string;
+  /** Present only for cabinets that are playable today. */
+  route?: string;
+  control: string;
+  accent: "sky" | "ocean" | "ice" | "indigo";
+  kind: "tower" | "brick" | "bubble" | "pinball";
+  bestKey: string;
+}
+
+const CABINETS: CabinetEntry[] = [
   {
     name: "Stack Tower",
+    route: "/games/stack-tower",
     control: "Tap to drop",
     accent: "sky",
     kind: "tower",
@@ -29,7 +42,7 @@ const CABINETS = [
     kind: "pinball",
     bestKey: "imarket:pinball:best",
   },
-] as const;
+];
 
 /** Neon hall: hero copy + the cabinet row (the product). id="machines". */
 export function HallHero() {
@@ -62,7 +75,7 @@ export function HallHero() {
         <h2 className="font-display text-[11px] uppercase tracking-[0.25em] text-zinc-500">
           The hall
         </h2>
-        <p className="text-xs text-zinc-600">Rebuilding in 3D</p>
+        <p className="text-xs text-zinc-600">Stack Tower is live · three more in the works</p>
       </div>
 
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">
@@ -71,7 +84,13 @@ export function HallHero() {
             key={c.name}
             className="h-full min-w-[72%] shrink-0 snap-center sm:min-w-0"
           >
-            <CabinetPreview {...c} />
+            {c.route ? (
+              <Link href={c.route} className="block h-full">
+                <CabinetPreview {...c} />
+              </Link>
+            ) : (
+              <CabinetPreview {...c} />
+            )}
           </div>
         ))}
       </div>
