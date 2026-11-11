@@ -30,6 +30,8 @@ interface PlayerContextValue {
   /** True while the first account lookup for the current wallet is in flight. */
   loading: boolean;
   isRegistered: boolean;
+  /** True when the identity came from the dev stand-in, not a connected wallet. */
+  devActive: boolean;
   refresh: () => Promise<void>;
   register: (rawUsername: string) => Promise<RegisterOutcome>;
 }
@@ -47,6 +49,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<PlayerAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [lookupFor, setLookupFor] = useState<string | null>(null);
+  const [devPlayer, setDevPlayer] = useState<PlayerAccount | null>(null);
+
+  // Dev stand-in: `/api/dev/player` only answers under `next dev`, so this effect is
+  // inert in a production build and the gate behaves exactly as it always did.
+  useEffect(() => {
+    if (isConnected) {
+      setDevPlayer(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/dev/player", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { player?: PlayerAccount };
+        if (!cancelled) setDevPlayer(data.player ?? null);
+      } catch {
+        // No dev route reachable: fall through to the real gate.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected]);
 
   const refresh = useCallback(async () => {
     if (!address) {
@@ -113,21 +139,51 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [address, signMessageAsync],
   );
 
+  const devActive = devPlayer !== null && !isConnected;
+
   const value = useMemo<PlayerContextValue>(
     () => ({
-      address,
-      isConnected,
-      player,
+      address: address ?? (devPlayer?.address as `0x${string}` | undefined),
+      isConnected: isConnected || devActive,
+      player: player ?? devPlayer,
       // Only "loading" once we know which wallet we are waiting on.
       loading: Boolean(address) && (loading || lookupFor !== address),
-      isRegistered: Boolean(player),
+      isRegistered: Boolean(player ?? devPlayer),
+      devActive,
       refresh,
       register,
     }),
-    [address, isConnected, player, loading, lookupFor, refresh, register],
+    [
+      address,
+      isConnected,
+      devActive,
+      player,
+      devPlayer,
+      loading,
+      lookupFor,
+      refresh,
+      register,
+    ],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>
+      {children}
+      {devActive ? <DevRibbon /> : null}
+    </PlayerContext.Provider>
+  );
+}
+
+/** Marks a screenshotted build as the dev stand-in, so no capture reads as signed in. */
+function DevRibbon() {
+  return (
+    <div
+      role="status"
+      className="font-display fixed bottom-3 right-3 z-50 border border-amber-400/70 bg-black/90 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-amber-300"
+    >
+      Dev player · no wallet
+    </div>
+  );
 }
 
 export function usePlayer(): PlayerContextValue {
