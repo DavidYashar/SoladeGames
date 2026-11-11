@@ -132,7 +132,8 @@ if (account.amount === 0n) {
   writeFileSync(mintPath, JSON.stringify(record, null, 2));
 }
 
-const minted = Number(account.amount) / 10 ** DECIMALS;
+const settled = await connection.getTokenAccountBalance(account.address);
+const minted = Number(settled.value.amount) / 10 ** DECIMALS;
 console.log(`token balance    ${minted.toLocaleString()} (9 decimals, 1 = $1)`);
 console.log(`token account    ${account.address.toBase58()}`);
 console.log("\nadd to web/.env.local:\n");
