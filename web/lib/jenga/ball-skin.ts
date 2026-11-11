@@ -93,9 +93,9 @@ export function makeShadowTexture(size = 256): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
   const r = size / 2;
   const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
-  grad.addColorStop(0, "rgba(0,0,0,0.80)");
-  grad.addColorStop(0.40, "rgba(0,0,0,0.38)");
-  grad.addColorStop(0.75, "rgba(0,0,0,0.06)");
+  grad.addColorStop(0, "rgba(0,0,0,0.96)");
+  grad.addColorStop(0.55, "rgba(0,0,0,0.78)");
+  grad.addColorStop(0.80, "rgba(0,0,0,0.34)");
   grad.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
