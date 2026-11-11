@@ -36,6 +36,8 @@ export function initRapier(): Promise<void> {
 interface PullState {
   id: number;
   t: number;
+  /** Seconds this extraction takes, scaled by the load the plank carries. */
+  duration: number;
   dir: 1 | -1;
   from: { x: number; y: number; z: number };
   alongX: boolean;
@@ -228,7 +230,7 @@ export class JengaSim {
     if (this.pull) {
       const body = this.body(this.pull.id);
       if (body) {
-        this.pull.t += DT / PULL_SECONDS;
+        this.pull.t += DT / this.pull.duration;
         const k = Math.min(1, this.pull.t);
         const travel = PULL_DISTANCE * k;
         body.setNextKinematicTranslation({
@@ -270,6 +272,11 @@ export class JengaSim {
 
     const t = body.translation();
     body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+
+    // Resistance: a plank buried under the tower takes longer to free than a loose one
+    // near the top. This is feel, not physics, but it tells the player what they face.
+    const above = this.planks.filter((q) => !q.removed && q.layer > p.layer).length;
+    const duration = PULL_SECONDS * (1 + (above / 54) * 2.4);
     // A kinematic body has infinite mass, so wood-on-wood friction would let it fling
     // the planks resting on it. Make the plank being extracted slick: it still
     // carries load while it slides, but it cannot drag its neighbours along.
@@ -286,6 +293,7 @@ export class JengaSim {
     this.pull = {
       id,
       t: 0,
+      duration,
       dir,
       from: { x: t.x, y: t.y, z: t.z },
       alongX: p.alongX,
