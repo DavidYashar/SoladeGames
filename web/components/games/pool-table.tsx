@@ -231,7 +231,7 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       // The blob sits on the cloth and tracks the ball, spreading as the ball lifts.
       const lift = Math.max(0, t.y - (FELT_TOP + BALL_R));
       const spread = 1 + lift * 0.5;
-      shadow.current.position.set(t.x + BALL_R * 0.35, FELT_TOP + 0.002, t.z);
+      shadow.current.position.set(t.x + BALL_R * 0.55, FELT_TOP + 0.002, t.z);
       shadow.current.scale.set(spread, 1, spread);
     }
   });
@@ -276,7 +276,7 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0.42, BED.y + 0.003, 0.3]}
       >
-        <planeGeometry args={[BALL_R * 3.2, BALL_R * 3.2]} />
+        <planeGeometry args={[BALL_R * 3.0, BALL_R * 3.0]} />
         <meshBasicMaterial
           map={shadowTex}
           transparent
