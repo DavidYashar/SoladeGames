@@ -9,6 +9,7 @@ import type { Mesh } from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 import { makeBallTexture, makeShadowTexture } from "@/lib/jenga/ball-skin";
+import { makeBrickTextures } from "@/lib/jenga/brick-skins";
 import { makeWoodTextures } from "@/lib/jenga/wood";
 
 /**
@@ -50,34 +51,30 @@ const BRICK_WEIGHTS: { kind: BrickKind; weight: number }[] = [
 ];
 
 interface BrickLook {
-  color: string;
   roughness: number;
   metalness: number;
+  bumpScale: number;
   opacity?: number;
   emissive?: string;
   emissiveIntensity?: number;
+  envMapIntensity?: number;
 }
 
 const BRICK_LOOK: Record<BrickKind, BrickLook> = {
-  clay: { color: "#b0533a", roughness: 0.82, metalness: 0.02 },
-  stone: { color: "#5f6266", roughness: 0.92, metalness: 0.04 },
-  keg: { color: "#6f1d1d", roughness: 0.7, metalness: 0.18 },
-  gold: {
-    color: "#d8a53c",
-    roughness: 0.22,
-    metalness: 0.95,
-    emissive: "#3a2a00",
-    emissiveIntensity: 0.5,
-  },
+  clay: { roughness: 0.92, metalness: 0.02, bumpScale: 0.025 },
+  stone: { roughness: 0.96, metalness: 0.03, bumpScale: 0.03 },
+  keg: { roughness: 0.72, metalness: 0.35, bumpScale: 0.02 },
+  gold: { roughness: 0.2, metalness: 1, bumpScale: 0.006, envMapIntensity: 1.4 },
   glass: {
-    color: "#6fd6ea",
-    roughness: 0.05,
+    roughness: 0.06,
     metalness: 0,
-    opacity: 0.72,
+    bumpScale: 0.012,
+    opacity: 0.62,
     emissive: "#0d3540",
-    emissiveIntensity: 0.45,
+    emissiveIntensity: 0.35,
+    envMapIntensity: 1.2,
   },
-  iron: { color: "#4a4f57", roughness: 0.38, metalness: 0.9 },
+  iron: { roughness: 0.42, metalness: 0.95, bumpScale: 0.012, envMapIntensity: 1.1 },
 };
 
 function seeded(seed: number): () => number {
@@ -186,36 +183,73 @@ function Rivets() {
 }
 
 function BrickWall({ bricks }: { bricks: BrickSpec[] }) {
+  const materials = useMemo(() => {
+    const out = {} as Record<BrickKind, THREE.MeshStandardMaterial>;
+    (Object.keys(BRICK_LOOK) as BrickKind[]).forEach((kind) => {
+      const look = BRICK_LOOK[kind];
+      const textures = makeBrickTextures(kind);
+      out[kind] = new THREE.MeshStandardMaterial({
+        map: textures.map,
+        roughnessMap: textures.roughnessMap,
+        bumpMap: textures.bumpMap,
+        bumpScale: look.bumpScale,
+        roughness: look.roughness,
+        metalness: look.metalness,
+        transparent: look.opacity !== undefined,
+        opacity: look.opacity ?? 1,
+        emissive: look.emissive ?? "#000000",
+        emissiveIntensity: look.emissiveIntensity ?? 0,
+        envMapIntensity: look.envMapIntensity ?? 0.7,
+      });
+    });
+    return out;
+  }, []);
+
   return (
     <group>
-      {bricks.map((b, i) => {
-        const look = BRICK_LOOK[b.kind];
-        return (
-          <RoundedBox
-            key={i}
-            args={[BRICK.d, BRICK.h, BRICK.w]}
-            radius={0.008}
-            smoothness={2}
-            position={[b.x, BED.y + BRICK.h / 2, b.z]}
-            castShadow
-            receiveShadow
-          >
-            <meshStandardMaterial
-              color={look.color}
-              roughness={look.roughness}
-              metalness={look.metalness}
-              transparent={look.opacity !== undefined}
-              opacity={look.opacity ?? 1}
-              emissive={look.emissive ?? "#000000"}
-              emissiveIntensity={look.emissiveIntensity ?? 0}
-            />
-            {b.kind === "keg" ? <KegBands /> : null}
-            {b.kind === "iron" ? <Rivets /> : null}
-          </RoundedBox>
-        );
-      })}
+      {bricks.map((b, i) => (
+        <RoundedBox
+          key={i}
+          args={[BRICK.d, BRICK.h, BRICK.w]}
+          radius={0.008}
+          smoothness={2}
+          position={[b.x, BED.y + BRICK.h / 2, b.z]}
+          castShadow
+          receiveShadow
+        >
+          <primitive object={materials[b.kind]} attach="material" />
+          {b.kind === "keg" ? <KegBands /> : null}
+          {b.kind === "iron" ? <Rivets /> : null}
+        </RoundedBox>
+      ))}
     </group>
   );
+}
+
+/** A neutral room probe, so metal bricks have something to reflect. */
+function EnvSetup() {
+  const { gl, scene } = useThree();
+
+  useEffect(() => {
+    let disposed: THREE.Texture | null = null;
+    void (async () => {
+      const { RoomEnvironment } = await import(
+        "three/examples/jsm/environments/RoomEnvironment.js"
+      );
+      const pmrem = new THREE.PMREMGenerator(gl);
+      const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environment = env;
+      scene.environmentIntensity = 0.2;
+      disposed = env;
+      pmrem.dispose();
+    })();
+    return () => {
+      scene.environment = null;
+      disposed?.dispose();
+    };
+  }, [gl, scene]);
+
+  return null;
 }
 
 /** The handler: the bar the player moves, sitting near their end of the table. */
@@ -521,6 +555,8 @@ export function PoolTable() {
       >
         <color attach="background" args={["#050506"]} />
         <fog attach="fog" args={["#050506", 6, 22]} />
+
+        <EnvSetup />
 
         <ambientLight intensity={0.3} />
 
