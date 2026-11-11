@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import type { Group, Mesh, OrthographicCamera } from "three";
+import type { Group, Mesh, PerspectiveCamera } from "three";
 
 import { dateKey } from "@/lib/puzzles/date";
 import {
@@ -20,6 +20,9 @@ import {
 } from "@/lib/games/stack-tower";
 
 const BLOCK_DEPTH = 0.5;
+
+/** Radians the board leans back. Positive tips the top away from the viewer. */
+const BOARD_PITCH = 0.18;
 const BEST_KEY = "imarket:stack-tower:best";
 
 const KIND_COLOR: Record<StackKind, string> = {
@@ -122,14 +125,19 @@ function SimRunner({ sim }: { sim: Sim }) {
 }
 
 /**
- * Orthographic view: yaw only. A perspective camera bends the top and bottom edges
- * of a tall object, which reads as a tilt. This keeps every vertical vertical.
+ * Long-lens perspective, level and centred. The convergence here is what makes the
+ * tilted board read as receding; a wide lens would overdo it and bend the cabinet.
  */
 function FitCamera() {
   const { camera, size } = useThree();
   useEffect(() => {
-    const c = camera as OrthographicCamera;
-    c.zoom = Math.min(size.height / 13.2, size.width / 9.2);
+    const c = camera as PerspectiveCamera;
+    const vFov = (c.fov * Math.PI) / 180;
+    const aspect = size.width / Math.max(1, size.height);
+    const distV = 6.9 / Math.tan(vFov / 2);
+    const distH = 4.9 / (Math.tan(vFov / 2) * aspect);
+    c.position.set(0, 0, Math.max(distV, distH));
+    c.lookAt(0, 0, 0);
     c.updateProjectionMatrix();
   }, [camera, size.height, size.width]);
   return null;
@@ -159,6 +167,35 @@ function Blocks({ blocks }: { blocks: Placed[] }) {
   );
 }
 
+/**
+ * Board markings. Without lines the tilted plane is a flat black rectangle and the
+ * perspective has nothing to converge, so the tilt reads as nothing at all.
+ */
+function BoardGrid() {
+  const lines: React.ReactElement[] = [];
+  const halfW = FIELD_W / 2;
+  const halfH = FIELD_H / 2;
+
+  for (let y = -halfH; y <= halfH + 0.001; y += 0.75) {
+    lines.push(
+      <mesh key={`h${y.toFixed(2)}`} position={[0, y, 0.002]}>
+        <planeGeometry args={[FIELD_W, 0.012]} />
+        <meshBasicMaterial color={Math.abs(y) < 0.01 ? "#2f7fb4" : "#173f5c"} />
+      </mesh>,
+    );
+  }
+  for (let x = -halfW; x <= halfW + 0.001; x += 0.75) {
+    lines.push(
+      <mesh key={`v${x.toFixed(2)}`} position={[x, 0, 0.002]}>
+        <planeGeometry args={[0.012, FIELD_H]} />
+        <meshBasicMaterial color={Math.abs(x) < 0.01 ? "#2f7fb4" : "#173f5c"} />
+      </mesh>,
+    );
+  }
+
+  return <>{lines}</>;
+}
+
 function Rig({ children }: { children: React.ReactNode }) {
   const group = useRef<Group>(null);
   // A slight yaw so the cabinet reads as a solid object, not a poster.
@@ -182,16 +219,24 @@ function Scene({ sim, blocks }: { sim: Sim; blocks: Placed[] }) {
       <Rig>
         <Cabinet />
 
-        {/* The playfield the blocks sit on, recessed behind the frame's lip. */}
-        <mesh position={[0, 0, -0.47]}>
-          <planeGeometry args={[FIELD_W, FIELD_H]} />
-          <meshStandardMaterial color="#0a1220" roughness={0.9} metalness={0.05} />
-        </mesh>
+        {/* The board is tilted back inside the upright cabinet, like a screen set at
+            an angle: its top edge sits farther from the viewer than its bottom. */}
+        <group rotation={[-BOARD_PITCH, 0, 0]} position={[0, 0, -0.55]}>
+          <mesh position={[0, 0, -0.15]}>
+            <planeGeometry args={[FIELD_W * 1.12, FIELD_H * 1.34]} />
+            <meshStandardMaterial
+              color="#0c1a2a"
+              emissive="#0a1c30"
+              emissiveIntensity={0.55}
+              roughness={0.9}
+              metalness={0.05}
+            />
+          </mesh>
 
-
-
-        <Blocks blocks={blocks} />
-        <SimRunner sim={sim} />
+          <BoardGrid />
+          <Blocks blocks={blocks} />
+          <SimRunner sim={sim} />
+        </group>
       </Rig>
     </>
   );
@@ -299,8 +344,7 @@ export function StackTowerGame() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#05060a]">
       <Canvas
-        orthographic
-        camera={{ position: [0, 0, 30], zoom: 62, near: 0.1, far: 200 }}
+        camera={{ position: [0, 0, 52], fov: 17, near: 1, far: 200 }}
         dpr={[1, 2]}
         onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
       >

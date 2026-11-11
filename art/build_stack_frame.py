@@ -79,7 +79,7 @@ def build() -> None:
     box("RailBottom", (0, 0, -half_h - RAIL / 2), (OPEN_W + RAIL * 2, DEPTH, RAIL), shell)
 
     # Recessed back wall, sitting behind the playfield.
-    box("BackWall", (0, DEPTH / 2 - 0.06, 0), (OPEN_W, 0.1, OPEN_H), shell)
+    # No back wall: the playfield tilts inside the window and would clip through it.
 
     # Inner lip: a thin bright edge so the window reads as an opening.
     lip_z = half_h + 0.02
