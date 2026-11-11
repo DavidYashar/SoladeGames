@@ -93,10 +93,14 @@ export function makeShadowTexture(size = 256): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
   const r = size / 2;
   const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
-  grad.addColorStop(0, "rgba(0,0,0,0.96)");
-  grad.addColorStop(0.55, "rgba(0,0,0,0.78)");
-  grad.addColorStop(0.80, "rgba(0,0,0,0.34)");
-  grad.addColorStop(1, "rgba(0,0,0,0)");
+  // A continuous falloff: densest at the point of contact, gone at the rim.
+  grad.addColorStop(0.0, "rgba(0,0,0,0.97)");
+  grad.addColorStop(0.18, "rgba(0,0,0,0.86)");
+  grad.addColorStop(0.38, "rgba(0,0,0,0.62)");
+  grad.addColorStop(0.58, "rgba(0,0,0,0.38)");
+  grad.addColorStop(0.78, "rgba(0,0,0,0.16)");
+  grad.addColorStop(0.92, "rgba(0,0,0,0.04)");
+  grad.addColorStop(1.0, "rgba(0,0,0,0)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
