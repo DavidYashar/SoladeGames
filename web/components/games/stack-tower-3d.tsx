@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import type { Group, Mesh } from "three";
+import type { Group, Mesh, OrthographicCamera } from "three";
 
 import { dateKey } from "@/lib/puzzles/date";
 import {
@@ -121,6 +121,20 @@ function SimRunner({ sim }: { sim: Sim }) {
   );
 }
 
+/**
+ * Orthographic view: yaw only. A perspective camera bends the top and bottom edges
+ * of a tall object, which reads as a tilt. This keeps every vertical vertical.
+ */
+function FitCamera() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const c = camera as OrthographicCamera;
+    c.zoom = Math.min(size.height / 13.2, size.width / 9.2);
+    c.updateProjectionMatrix();
+  }, [camera, size.height, size.width]);
+  return null;
+}
+
 function Cabinet() {
   const { scene } = useGLTF("/models/stack_frame.glb");
   return <primitive object={scene} />;
@@ -158,6 +172,7 @@ function Rig({ children }: { children: React.ReactNode }) {
 function Scene({ sim, blocks }: { sim: Sim; blocks: Placed[] }) {
   return (
     <>
+      <FitCamera />
       <color attach="background" args={["#05060a"]} />
       <ambientLight intensity={0.85} />
       <directionalLight position={[-6, 8, 10]} intensity={1.6} color="#cfe6ff" />
@@ -284,7 +299,8 @@ export function StackTowerGame() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#05060a]">
       <Canvas
-        camera={{ position: [0, 0, 23.5], fov: 34 }}
+        orthographic
+        camera={{ position: [0, 0, 30], zoom: 62, near: 0.1, far: 200 }}
         dpr={[1, 2]}
         onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
       >
