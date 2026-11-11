@@ -1,3 +1,6 @@
+> **SUPERSEDED.** This describes the earlier sliding-stack game, which was deleted.
+> The current game is documented in [STACK-TOWER.md](./STACK-TOWER.md).
+
 # Arkade game rules
 
 The four cabinets, written down as rules rather than code.
