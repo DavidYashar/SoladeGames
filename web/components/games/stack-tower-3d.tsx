@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -13,23 +13,92 @@ const WOOD = "#d8a45e";
 const WOOD_DARK = "#a9762f";
 const HOVER = "#f2c98a";
 
-function Tower({
+type Side = "player" | "machine";
+type Phase = "pull" | "place" | "over";
+
+interface MatchState {
+  turn: Side;
+  phase: Phase;
+  loser: Side | null;
+}
+
+const THINK_MS = 850;
+const PLACE_PAUSE_MS = 320;
+
+interface MatchRef {
+  turn: Side;
+  phase: Phase;
+  loser: Side | null;
+  options: Placement[] | null;
+  /** Timestamp (ms) at which the machine is allowed to act. */
+  actAt: number;
+}
+
+function legalPlanks(sim: JengaSim) {
+  return sim.planks.filter((p) => {
+    if (p.removed || isTopLayer(p.layer)) return false;
+    const left = sim.planks.filter((q) => q.layer === p.layer && !q.removed).length;
+    return left > 1;
+  });
+}
+
+function Scene({
   sim,
-  options,
-  setOptions,
+  onMatch,
 }: {
   sim: JengaSim;
-  options: Placement[] | null;
-  setOptions: (next: Placement[] | null) => void;
+  onMatch: (state: MatchState) => void;
 }) {
   const meshes = useRef(new Map<number, Mesh>());
   const acc = useRef(0);
   const wasPulling = useRef(false);
-
   const [hovered, setHovered] = useState<number | null>(null);
-  const [, forceRender] = useState(0);
+
+  const match = useRef<MatchRef>({
+    turn: "player",
+    phase: "pull",
+    loser: null,
+    options: null,
+    actAt: 0,
+  });
+
+  const publish = useCallback(() => {
+    onMatch({ turn: match.current.turn, phase: match.current.phase, loser: match.current.loser });
+  }, [onMatch]);
+
+  const finish = (loser: Side) => {
+    match.current.phase = "over";
+    match.current.loser = loser;
+    match.current.options = null;
+    publish();
+  };
+
+  /** Runs one turn-boundary decision. Called every frame, cheap when nothing is due. */
+  const tickMatch = (now: number) => {
+    const m = match.current;
+    if (m.phase === "over") return;
+
+    if (m.phase === "place") {
+      // Player is choosing; nothing to do until they click.
+      return;
+    }
+
+    if (m.turn === "machine" && m.phase === "pull" && now >= m.actAt) {
+      const legal = legalPlanks(sim);
+      if (legal.length === 0) {
+        finish("machine");
+        return;
+      }
+      // Placeholder opponent: any legal plank, then any placement. The real policy
+      // (stability probe) replaces this without touching the turn machine.
+      const pick = legal[Math.floor(Math.random() * legal.length)];
+      sim.beginPull(pick.id, Math.random() < 0.5 ? 1 : -1);
+    }
+  };
 
   useFrame((_, delta) => {
+    const now = performance.now();
+
     acc.current += Math.min(delta, 0.1);
     let steps = 0;
     while (acc.current >= DT && steps < 8) {
@@ -45,15 +114,49 @@ function Tower({
       mesh.quaternion.set(t.qx, t.qy, t.qz, t.qw);
     }
 
-    // The extraction finished this frame: offer the placements for the plank.
+    const m = match.current;
+
+    // A pull just ended: judge the tower, then either ask the player where to place,
+    // or let the machine place on its own.
     if (wasPulling.current && !sim.pulling) {
-      setOptions(sim.placementOptions());
+      wasPulling.current = false;
+
+      if (sim.fallen().length > 0) {
+        finish(m.turn);
+        return;
+      }
+
+      if (m.turn === "player") {
+        m.options = sim.placementOptions();
+        m.phase = "place";
+        publish();
+      } else {
+        const opts = sim.placementOptions();
+        if (opts.length === 0) {
+          finish("machine");
+          return;
+        }
+        const chosen = opts[Math.floor(Math.random() * opts.length)];
+        sim.place(chosen);
+        sim.settle(0.8);
+        if (sim.fallen().length > 0) {
+          finish("machine");
+          return;
+        }
+        m.turn = "player";
+        m.phase = "pull";
+        publish();
+      }
+      return;
     }
-    wasPulling.current = sim.pulling;
+    if (sim.pulling) wasPulling.current = true;
+
+    tickMatch(now);
   });
 
-  const canPull = (id: number, layer: number) => {
-    if (options) return false;
+  const canPull = (layer: number) => {
+    const m = match.current;
+    if (m.phase !== "pull" || m.turn !== "player") return false;
     if (isTopLayer(layer)) return false;
     const left = sim.planks.filter((p) => p.layer === layer && !p.removed).length;
     return left > 1 && !sim.pulling;
@@ -61,29 +164,59 @@ function Tower({
 
   const onPull = (id: number, layer: number) => (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    if (!canPull(id, layer)) return;
+    if (!canPull(layer)) return;
     sim.beginPull(id, 1);
-    forceRender((n) => n + 1);
+  };
+
+  const placeOption = (opt: Placement) => {
+    const m = match.current;
+    if (m.phase !== "place") return;
+    sim.place(opt);
+    sim.settle(0.8);
+    if (sim.fallen().length > 0) {
+      finish("player");
+      return;
+    }
+    m.options = null;
+    m.turn = "machine";
+    m.phase = "pull";
+    m.actAt = performance.now() + THINK_MS;
+    publish();
   };
 
   const onPlace = (opt: Placement) => (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    sim.place(opt);
-    sim.settle(0.6);
-    setOptions(null);
-    forceRender((n) => n + 1);
+    placeOption(opt);
   };
+
+  // Test hook: same code path as a click, without a pointer.
+  const debugApi = useRef({
+    place: (_index: number) => {},
+    state: () => ({ turn: "player" as Side, phase: "pull" as Phase, loser: null as Side | null }),
+  });
+  debugApi.current.place = (index: number) => {
+    const opt = match.current.options?.[index];
+    if (opt) placeOption(opt);
+  };
+  debugApi.current.state = () => ({
+    turn: match.current.turn,
+    phase: match.current.phase,
+    loser: match.current.loser,
+  });
+  useEffect(() => {
+    (window as unknown as { __game?: typeof debugApi.current }).__game = debugApi.current;
+  }, []);
 
   return (
     <group>
       {sim.planks.map((p) => {
         const he = halfExtents(p.alongX);
-        const selectable = canPull(p.id, p.layer);
+        const selectable = canPull(p.layer) && !sim.planks.find((q) => q.id === p.id)?.removed;
         return (
           <mesh
             key={p.id}
-            ref={(m) => {
-              if (m) meshes.current.set(p.id, m);
+            ref={(mesh) => {
+              if (mesh) meshes.current.set(p.id, mesh);
               else meshes.current.delete(p.id);
             }}
             position={[p.x, p.y, p.z]}
@@ -100,13 +233,7 @@ function Tower({
             <boxGeometry args={[he.x * 2, he.y * 2, he.z * 2]} />
             <meshStandardMaterial
               color={
-                !selectable
-                  ? "#6b5233"
-                  : hovered === p.id
-                    ? HOVER
-                    : p.alongX
-                      ? WOOD
-                      : WOOD_DARK
+                !selectable ? "#6b5233" : hovered === p.id ? HOVER : p.alongX ? WOOD : WOOD_DARK
               }
               roughness={0.62}
               metalness={0.02}
@@ -115,29 +242,29 @@ function Tower({
         );
       })}
 
-      {/* Where the extracted plank may go. Hovering targets, not physics bodies. */}
-      {options?.map((o) => {
-        const he = halfExtents(o.alongX);
-        return (
-          <mesh
-            key={`${o.layer}-${o.alongX}-${o.slot}`}
-            position={[o.x, o.y + 0.05, o.z]}
-            onClick={onPlace(o)}
-            onPointerOver={(e) => e.stopPropagation()}
-          >
-            <boxGeometry args={[he.x * 2, he.y * 2, he.z * 2]} />
-            <meshStandardMaterial
-              color="#7fd8ff"
-              emissive="#2aa6d6"
-              emissiveIntensity={0.7}
-              transparent
-              opacity={0.28}
-              wireframe
-              roughness={0.4}
-            />
-          </mesh>
-        );
-      })}
+      {match.current.options && match.current.phase === "place"
+        ? match.current.options.map((o) => {
+            const he = halfExtents(o.alongX);
+            return (
+              <mesh
+                key={`${o.layer}-${o.alongX}-${o.slot}`}
+                position={[o.x, o.y + 0.05, o.z]}
+                onClick={onPlace(o)}
+                onPointerOver={(e) => e.stopPropagation()}
+              >
+                <boxGeometry args={[he.x * 2, he.y * 2, he.z * 2]} />
+                <meshStandardMaterial
+                  color="#7fd8ff"
+                  emissive="#2aa6d6"
+                  emissiveIntensity={0.7}
+                  transparent
+                  opacity={0.3}
+                  wireframe
+                />
+              </mesh>
+            );
+          })
+        : null}
     </group>
   );
 }
@@ -145,7 +272,7 @@ function Tower({
 export function StackTowerGame() {
   const [sim, setSim] = useState<JengaSim | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [options, setOptions] = useState<Placement[] | null>(null);
+  const [match, setMatch] = useState<MatchState>({ turn: "player", phase: "pull", loser: null });
 
   useEffect(() => {
     let cancelled = false;
@@ -154,7 +281,6 @@ export function StackTowerGame() {
         const s = await JengaSim.create();
         s.settle(3.0);
         if (cancelled) return;
-        // Debug handle: lets the sandbox and the agent inspect the live tower.
         (window as unknown as { __jenga?: JengaSim }).__jenga = s;
         setSim(s);
       } catch (e) {
@@ -170,6 +296,8 @@ export function StackTowerGame() {
     () => ({ position: [13, 11, 13] as [number, number, number], fov: 42 }),
     [],
   );
+
+  const over = match.phase === "over";
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#0b0b0d]">
@@ -188,7 +316,7 @@ export function StackTowerGame() {
           />
           <directionalLight position={[-9, 6, -7]} intensity={0.45} color="#9fb6d4" />
 
-          <Tower sim={sim} options={options} setOptions={setOptions} />
+          <Scene sim={sim} onMatch={setMatch} />
 
           <mesh position={[0, -0.26, 0]} receiveShadow>
             <boxGeometry args={[26, 0.5, 26]} />
@@ -199,7 +327,7 @@ export function StackTowerGame() {
             target={[0, (LAYERS * PLANK.h) / 2 + 1.2, 0]}
             enablePan={false}
             minDistance={9}
-            maxDistance={28}
+            maxDistance={30}
             maxPolarAngle={Math.PI / 2.05}
           />
         </Canvas>
@@ -224,10 +352,23 @@ export function StackTowerGame() {
         </div>
 
         <div className="text-center">
-          <p className="font-display text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-            {options
-              ? "choose where the plank goes"
-              : "drag to orbit · click a plank to pull it · the top layer is locked"}
+          <p className="font-display text-[11px] uppercase tracking-[0.18em] text-zinc-200">
+            {over
+              ? match.loser === "player"
+                ? "the tower fell on your turn"
+                : "the tower fell on the machine's turn"
+              : match.turn === "player"
+                ? match.phase === "place"
+                  ? "your turn · choose where it goes"
+                  : "your turn · pull a plank"
+                : "machine is thinking"}
+          </p>
+          <p className="font-display mt-2 text-[9px] uppercase tracking-[0.14em] text-zinc-600">
+            {over
+              ? match.loser === "player"
+                ? "you lose"
+                : "you win"
+              : "drag to orbit · the top layer is locked"}
           </p>
           {!sim && !error && (
             <p className="font-display mt-2 text-[10px] uppercase tracking-[0.16em] text-zinc-600">
