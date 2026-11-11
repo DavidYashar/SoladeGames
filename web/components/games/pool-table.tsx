@@ -98,6 +98,23 @@ const HANDLER_HALF = 0.23;
 const BALL_SPEED = 5.4;
 
 /**
+ * Restitution alone only ever removes energy, so the ball dies out mid-table. Every
+ * surface the ball strikes adds a little back, and a floor keeps it alive.
+ */
+const BOUNCE_BOOST: Record<BrickKind, number> = {
+  clay: 1.12,
+  stone: 1.15,
+  keg: 1.15,
+  gold: 1.18,
+  glass: 1.24,
+  iron: 1.3,
+};
+const HANDLER_BOOST = 1.2;
+const CUSHION_BOOST = 1.06;
+const MIN_SPEED = 4.6;
+const MAX_SPEED = 9;
+
+/**
  * Bounce and grip per material. Glass rings and keeps the ball fast, clay deadens it,
  * iron kicks it back almost as hard as it arrived.
  */
@@ -113,6 +130,8 @@ const BRICK_BOUNCE: Record<BrickKind, { restitution: number; friction: number }>
 /** State shared between the physics world and the movable handler. */
 const shared = {
   handlerZ: 0,
+  ballCollider: 0,
+  boostByHandle: new Map<number, number>(),
   handlerBody: null as RAPIER.RigidBody | null,
   ballBody: null as RAPIER.RigidBody | null,
 };
@@ -378,6 +397,8 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
   const world = useRef<RAPIER.World | null>(null);
   const body = useRef<RAPIER.RigidBody | null>(null);
   const acc = useRef(0);
+  const events = useRef<RAPIER.EventQueue | null>(null);
+  const incoming = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -401,13 +422,15 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       );
 
       // Cushion faces.
-      const wall = (hx: number, hy: number, hz: number, x: number, y: number, z: number) =>
-        w.createCollider(
+      const wall = (hx: number, hy: number, hz: number, x: number, y: number, z: number) => {
+        const collider = w.createCollider(
           RAPIER.ColliderDesc.cuboid(hx, hy, hz)
             .setTranslation(x, y, z)
             .setFriction(0.2)
             .setRestitution(0.92),
         );
+        shared.boostByHandle.set(collider.handle, CUSHION_BOOST);
+      };
 
       // Slabs sit outside the playing surface, so their inner faces are exactly the
       // cushion faces the player sees.
@@ -419,12 +442,13 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       // Bricks: solid for now, each with the bounce its material implies.
       for (const b of bricks) {
         const bounce = BRICK_BOUNCE[b.kind];
-        w.createCollider(
+        const collider = w.createCollider(
           RAPIER.ColliderDesc.cuboid(BRICK.d / 2, BRICK.h / 2, BRICK.w / 2)
             .setTranslation(b.x, BED.y + BRICK.h / 2, b.z)
             .setFriction(bounce.friction)
             .setRestitution(bounce.restitution),
         );
+        shared.boostByHandle.set(collider.handle, BOUNCE_BOOST[b.kind]);
       }
 
       // The handler is kinematic: it moves where the pointer puts it and shoves the
@@ -436,12 +460,13 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
           shared.handlerZ,
         ),
       );
-      w.createCollider(
+      const handlerCollider = w.createCollider(
         RAPIER.ColliderDesc.cuboid(0.035, 0.055, HANDLER_HALF)
           .setFriction(0.25)
           .setRestitution(0.9),
         handlerBody,
       );
+      shared.boostByHandle.set(handlerCollider.handle, HANDLER_BOOST);
       shared.handlerBody = handlerBody;
 
       const b = w.createRigidBody(
@@ -451,13 +476,15 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
           .setAngularDamping(0.15)
           .setCcdEnabled(true),
       );
-      w.createCollider(
+      const ballCollider = w.createCollider(
         RAPIER.ColliderDesc.ball(BALL_R)
           .setDensity(1.6)
           .setFriction(0.15)
-          .setRestitution(0.88),
+          .setRestitution(0.88)
+          .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
         b,
       );
+      shared.ballCollider = ballCollider.handle;
 
       // Launch it up the table toward the wall, with a slight angle.
       b.setLinvel({ x: -BALL_SPEED, y: 0, z: -0.45 }, true);
@@ -470,6 +497,7 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       world.current = w;
       body.current = b;
       shared.ballBody = b;
+      events.current = new RAPIER.EventQueue(true);
       (window as unknown as { __ballState?: () => unknown }).__ballState = () => {
         const t = b.translation();
         const v = b.linvel();
@@ -502,10 +530,52 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
 
     acc.current += Math.min(delta, 0.1);
     let steps = 0;
+    const queue = events.current;
+    const approach = b.linvel();
+    incoming.current = Math.hypot(approach.x, approach.z);
+
     while (acc.current >= w.timestep && steps < 8) {
-      w.step();
+      w.step(queue ?? undefined);
       acc.current -= w.timestep;
       steps += 1;
+    }
+
+    // Every surface the ball touched adds a little energy back. A floor keeps the ball
+    // alive on dead materials like clay; a ceiling stops it running away.
+    if (queue) {
+      const ball = shared.ballCollider;
+      queue.drainCollisionEvents((h1, h2, started) => {
+        if (!started) return;
+        if (h1 !== ball && h2 !== ball) return;
+        const other = h1 === ball ? h2 : h1;
+        const boost = shared.boostByHandle.get(other);
+        if (!boost) return;
+
+        const v = b.linvel();
+        const speed = Math.hypot(v.x, v.z);
+        if (speed < 0.02) return;
+        // Boost the speed the ball arrived with, not the speed restitution left it.
+        const target = Math.min(MAX_SPEED, Math.max(MIN_SPEED, incoming.current * boost));
+        const k = target / speed;
+        b.setLinvel({ x: v.x * k, y: v.y, z: v.z * k }, true);
+      });
+
+      // A floor every frame, not only on contact: a ball that has stopped rolling gets
+      // no further collision events, so it would otherwise sit there forever.
+      const v = b.linvel();
+      const speed = Math.hypot(v.x, v.z);
+      if (speed > 0.05 && speed < MIN_SPEED) {
+        const k = MIN_SPEED / speed;
+        b.setLinvel({ x: v.x * k, y: v.y, z: v.z * k }, true);
+      } else if (speed <= 0.05) {
+        // Dead ball: serve again from the handler.
+        const spawnX = HANDLER_X - 0.14;
+        b.setTranslation(
+          { x: spawnX, y: FELT_TOP + BALL_R, z: shared.handlerZ },
+          true,
+        );
+        b.setLinvel({ x: -BALL_SPEED, y: 0, z: 0 }, true);
+      }
     }
 
     const t = b.translation();
