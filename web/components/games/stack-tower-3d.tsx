@@ -149,7 +149,7 @@ function Rig({ children }: { children: React.ReactNode }) {
   const group = useRef<Group>(null);
   // A slight yaw so the cabinet reads as a solid object, not a poster.
   return (
-    <group ref={group} rotation={[0, -0.16, 0]} position={[0, 0.1, 0]}>
+    <group ref={group} rotation={[0, -0.18, 0]} position={[0, 0, 0]}>
       {children}
     </group>
   );
@@ -284,7 +284,7 @@ export function StackTowerGame() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#05060a]">
       <Canvas
-        camera={{ position: [4.2, 1.8, 23.0], fov: 34 }}
+        camera={{ position: [0, 0, 23.5], fov: 34 }}
         dpr={[1, 2]}
         onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
       >
