@@ -8,6 +8,7 @@ import type { Mesh } from "three";
 
 import { DT, JengaSim, type Placement } from "@/lib/jenga/sim";
 import { LAYERS, PLANK, halfExtents, isTopLayer } from "@/lib/jenga/tower";
+import { choosePlacement, choosePull, rankMoves } from "@/lib/jenga/policy";
 
 const WOOD = "#d8a45e";
 const WOOD_DARK = "#a9762f";
@@ -89,10 +90,14 @@ function Scene({
         finish("machine");
         return;
       }
-      // Placeholder opponent: any legal plank, then any placement. The real policy
-      // (stability probe) replaces this without touching the turn machine.
-      const pick = legal[Math.floor(Math.random() * legal.length)];
-      sim.beginPull(pick.id, Math.random() < 0.5 ? 1 : -1);
+      // The opponent is the math model in lib/jenga/policy.ts: geometry and mass,
+      // no learning, no randomness.
+      const move = choosePull(sim);
+      if (!move) {
+        finish("machine");
+        return;
+      }
+      sim.beginPull(move.plankId, 1);
     }
   };
 
@@ -136,7 +141,7 @@ function Scene({
           finish("machine");
           return;
         }
-        const chosen = opts[Math.floor(Math.random() * opts.length)];
+        const chosen = choosePlacement(sim, opts);
         sim.place(chosen);
         sim.settle(0.8);
         if (sim.fallen().length > 0) {
@@ -193,11 +198,13 @@ function Scene({
   const debugApi = useRef({
     place: (_index: number) => {},
     state: () => ({ turn: "player" as Side, phase: "pull" as Phase, loser: null as Side | null }),
+    rank: () => [] as unknown,
   });
   debugApi.current.place = (index: number) => {
     const opt = match.current.options?.[index];
     if (opt) placeOption(opt);
   };
+  debugApi.current.rank = () => rankMoves(sim, 5);
   debugApi.current.state = () => ({
     turn: match.current.turn,
     phase: match.current.phase,

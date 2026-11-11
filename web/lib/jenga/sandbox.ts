@@ -7,6 +7,7 @@
  */
 
 import { JengaSim } from "./sim";
+import { choosePlacement, choosePull } from "./policy";
 import { LAYERS, isTopLayer } from "./tower";
 
 /** Small deterministic PRNG so a run can be repeated exactly. */
@@ -51,6 +52,70 @@ export interface SandboxReport {
   /** Trials that survived every requested pull. */
   survivors: number;
   results: TrialResult[];
+}
+
+/**
+ * Same experiment, but both sides play the math model. This is how the opponent is
+ * judged: if it cannot outlast random play, the weights are wrong.
+ */
+export async function runPolicySandbox(trials = 4, turns = 40, randomize = false): Promise<{
+  trials: number;
+  turns: number;
+  collapses: number;
+  meanTurnsSurvived: number;
+  perTrial: { trial: number; collapsedAt: number | null }[];
+}> {
+  let survived = 0;
+  let collapsed = 0;
+  const perTrial: { trial: number; collapsedAt: number | null }[] = [];
+
+  for (let trial = 0; trial < trials; trial++) {
+    const sim = await JengaSim.create();
+    sim.settle(3.0);
+    const baseline = sim.fallen().length;
+    let collapsedAt: number | null = null;
+
+    for (let t = 0; t < turns; t++) {
+      if (randomize) {
+        const legal = sim.planks.filter((p) => !p.removed && p.layer < 17 &&
+          sim.planks.filter((q) => q.layer === p.layer && !q.removed).length > 1);
+        if (legal.length === 0) break;
+        sim.beginPull(legal[Math.floor(Math.random() * legal.length)].id, 1);
+      } else {
+        const move = choosePull(sim);
+        if (!move) break;
+        sim.beginPull(move.plankId, 1);
+      }
+      sim.settle(0.9);
+      if (sim.fallen().length > baseline) {
+        collapsedAt = t + 1;
+        break;
+      }
+      const options = sim.placementOptions();
+      if (options.length === 0) break;
+      sim.place(randomize ? options[Math.floor(Math.random() * options.length)] : choosePlacement(sim, options));
+      sim.settle(0.7);
+      if (sim.fallen().length > baseline) {
+        collapsedAt = t + 1;
+        break;
+      }
+    }
+
+    if (collapsedAt === null) survived += turns;
+    else {
+      collapsed += 1;
+      survived += collapsedAt - 1;
+    }
+    perTrial.push({ trial, collapsedAt });
+  }
+
+  return {
+    trials,
+    turns,
+    collapses: collapsed,
+    meanTurnsSurvived: Number((survived / (collapsed + (trials - collapsed) || 1)).toFixed(2)),
+    perTrial,
+  };
 }
 
 export async function runSandbox(
