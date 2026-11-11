@@ -8,6 +8,7 @@ import * as THREE from "three";
 import type { Mesh } from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
+import { makeBallTexture } from "@/lib/jenga/ball-skin";
 import { makeWoodTextures } from "@/lib/jenga/wood";
 
 /**
@@ -226,14 +227,19 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
     }
   });
 
+  const skin = useMemo(() => makeBallTexture(), []);
+
   return (
     <mesh ref={mesh} position={[0.42, BED.y + BALL_R, 0.3]} castShadow receiveShadow>
       <sphereGeometry args={[BALL_R, 96, 64]} />
-      <meshStandardMaterial
-        color="#2f7fd8"
-        roughness={0.12}
-        metalness={0.05}
-        envMapIntensity={0.8}
+      <meshPhysicalMaterial
+        map={skin}
+        color="#9ec9ff"
+        roughness={0.18}
+        metalness={0.15}
+        clearcoat={1}
+        clearcoatRoughness={0.08}
+        envMapIntensity={1.2}
       />
     </mesh>
   );
@@ -375,6 +381,9 @@ export function PoolTable() {
         />
 
         <directionalLight position={[1.3, 2.6, 1.4]} intensity={0.85} color="#ffe9c8" castShadow />
+
+        {/* Rim light behind the ball, so its edge separates from the felt. */}
+        <pointLight position={[0.2, 1.05, -0.9]} intensity={2.2} distance={3} decay={2} color="#cfe6ff" />
 
         <Table bricks={bricks} />
 
