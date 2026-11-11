@@ -37,6 +37,9 @@ yarn-error.log*
 # local server data (paid-league ledger)
 /data
 
+# devnet keypair and test-token record
+/.keys
+
 # vercel
 .vercel
 
