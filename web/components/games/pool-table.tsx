@@ -33,7 +33,63 @@ const BRICK = { w: 0.16, h: 0.075, d: 0.075 };
 const BRICK_COLS = 8;
 const BRICK_ROWS = 5;
 const BRICK_GAP = 0.02;
-const BRICK_COLORS = ["#8a3a2c", "#9d4632", "#b0533a", "#c06343", "#cd7452"];
+
+type BrickKind = "clay" | "stone" | "keg" | "gold" | "glass" | "iron";
+
+/**
+ * Spawn weights. Clay is the bulk of the wall and iron is a rarity, so the wall reads
+ * as mostly ordinary with a few bricks worth aiming for.
+ */
+const BRICK_WEIGHTS: { kind: BrickKind; weight: number }[] = [
+  { kind: "clay", weight: 52 },
+  { kind: "stone", weight: 20 },
+  { kind: "glass", weight: 10 },
+  { kind: "keg", weight: 8 },
+  { kind: "gold", weight: 6 },
+  { kind: "iron", weight: 4 },
+];
+
+interface BrickLook {
+  color: string;
+  roughness: number;
+  metalness: number;
+  opacity?: number;
+  emissive?: string;
+  emissiveIntensity?: number;
+}
+
+const BRICK_LOOK: Record<BrickKind, BrickLook> = {
+  clay: { color: "#b0533a", roughness: 0.82, metalness: 0.02 },
+  stone: { color: "#5f6266", roughness: 0.92, metalness: 0.04 },
+  keg: { color: "#6f1d1d", roughness: 0.7, metalness: 0.18 },
+  gold: {
+    color: "#d8a53c",
+    roughness: 0.22,
+    metalness: 0.95,
+    emissive: "#3a2a00",
+    emissiveIntensity: 0.5,
+  },
+  glass: {
+    color: "#6fd6ea",
+    roughness: 0.05,
+    metalness: 0,
+    opacity: 0.72,
+    emissive: "#0d3540",
+    emissiveIntensity: 0.45,
+  },
+  iron: { color: "#4a4f57", roughness: 0.38, metalness: 0.9 },
+};
+
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /** A little larger than a real 57 mm ball, because true scale is a dot on screen. */
 const BALL_R = 0.042;
@@ -44,19 +100,46 @@ const HANDLER_X = 0.86;
 interface BrickSpec {
   x: number;
   z: number;
-  color: string;
+  kind: BrickKind;
 }
 
 function brickLayout(): BrickSpec[] {
+  const total = BRICK_COLS * BRICK_ROWS;
+  const sum = BRICK_WEIGHTS.reduce((acc, b) => acc + b.weight, 0);
+
+  // Exact quotas, so a type can never disappear the way pure weighted random allows.
+  const counts = BRICK_WEIGHTS.map((b) => Math.floor((b.weight / sum) * total));
+  let assigned = counts.reduce((acc, n) => acc + n, 0);
+  const byWeight = BRICK_WEIGHTS.map((b, i) => ({ i, weight: b.weight })).sort(
+    (a, b) => b.weight - a.weight,
+  );
+  for (let k = 0; assigned < total; k += 1, assigned += 1) {
+    counts[byWeight[k % byWeight.length].i] += 1;
+  }
+
+  const bag: BrickKind[] = [];
+  BRICK_WEIGHTS.forEach((b, i) => {
+    for (let n = 0; n < counts[i]; n += 1) bag.push(b.kind);
+  });
+
+  // Shuffle deterministically: the mix is fixed, the arrangement is not.
+  const random = seeded(0x5b21c);
+  for (let i = bag.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    const tmp = bag[i];
+    bag[i] = bag[j];
+    bag[j] = tmp;
+  }
+
   const out: BrickSpec[] = [];
   const startX = -0.98;
   const startZ = -((BRICK_COLS - 1) * (BRICK.w + BRICK_GAP)) / 2;
-  for (let row = 0; row < BRICK_ROWS; row++) {
-    for (let col = 0; col < BRICK_COLS; col++) {
+  for (let row = 0; row < BRICK_ROWS; row += 1) {
+    for (let col = 0; col < BRICK_COLS; col += 1) {
       out.push({
         x: startX + row * (BRICK.d + BRICK_GAP),
         z: startZ + col * (BRICK.w + BRICK_GAP),
-        color: BRICK_COLORS[row % BRICK_COLORS.length],
+        kind: bag[row * BRICK_COLS + col],
       });
     }
   }
@@ -69,22 +152,68 @@ function initRapier(): Promise<void> {
   return rapierReady;
 }
 
+/** Iron bands across a keg's face, so it reads as a barrel rather than a red brick. */
+function KegBands() {
+  return (
+    <>
+      {[-0.045, 0.045].map((z) => (
+        <mesh key={z} position={[BRICK.d / 2 - 0.001, 0, z]}>
+          <boxGeometry args={[0.004, BRICK.h * 0.98, 0.014]} />
+          <meshStandardMaterial color="#241713" roughness={0.55} metalness={0.55} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
+/** Rivets on the corners of an iron brick. */
+function Rivets() {
+  return (
+    <>
+      {[
+        [-0.045, -0.026],
+        [0.045, -0.026],
+        [-0.045, 0.026],
+        [0.045, 0.026],
+      ].map(([z, y]) => (
+        <mesh key={`${z}${y}`} position={[BRICK.d / 2 - 0.001, y, z]}>
+          <sphereGeometry args={[0.005, 10, 8]} />
+          <meshStandardMaterial color="#9aa1a9" roughness={0.3} metalness={0.95} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
 function BrickWall({ bricks }: { bricks: BrickSpec[] }) {
   return (
     <group>
-      {bricks.map((b, i) => (
-        <RoundedBox
-          key={i}
-          args={[BRICK.d, BRICK.h, BRICK.w]}
-          radius={0.008}
-          smoothness={2}
-          position={[b.x, BED.y + BRICK.h / 2, b.z]}
-          castShadow
-          receiveShadow
-        >
-          <meshStandardMaterial color={b.color} roughness={0.78} metalness={0.02} />
-        </RoundedBox>
-      ))}
+      {bricks.map((b, i) => {
+        const look = BRICK_LOOK[b.kind];
+        return (
+          <RoundedBox
+            key={i}
+            args={[BRICK.d, BRICK.h, BRICK.w]}
+            radius={0.008}
+            smoothness={2}
+            position={[b.x, BED.y + BRICK.h / 2, b.z]}
+            castShadow
+            receiveShadow
+          >
+            <meshStandardMaterial
+              color={look.color}
+              roughness={look.roughness}
+              metalness={look.metalness}
+              transparent={look.opacity !== undefined}
+              opacity={look.opacity ?? 1}
+              emissive={look.emissive ?? "#000000"}
+              emissiveIntensity={look.emissiveIntensity ?? 0}
+            />
+            {b.kind === "keg" ? <KegBands /> : null}
+            {b.kind === "iron" ? <Rivets /> : null}
+          </RoundedBox>
+        );
+      })}
     </group>
   );
 }
@@ -376,6 +505,11 @@ function Table({ bricks }: { bricks: BrickSpec[] }) {
 export function PoolTable() {
   const bricks = useMemo(() => brickLayout(), []);
 
+  // Test hook: the wall's composition, for checking spawn rates.
+  useEffect(() => {
+    (window as unknown as { __bricks?: string[] }).__bricks = bricks.map((b) => b.kind);
+  }, [bricks]);
+
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#050506]">
       <Canvas
@@ -450,7 +584,7 @@ export function PoolTable() {
           </p>
         </div>
         <p className="mx-auto rounded-sm bg-black/55 px-3 py-1 text-center font-display text-[9px] uppercase tracking-[0.16em] text-zinc-400">
-          ball is live · bricks and handler are static
+          six brick types · ball is live · bricks are static
         </p>
       </div>
     </div>
