@@ -95,7 +95,7 @@ const FELT_TOP = BED.y + 0.02;
 const HANDLER_X = 0.86;
 const HANDLER_Y = FELT_TOP + 0.032;
 const HANDLER_HALF = 0.23;
-const BALL_SPEED = 5.4;
+const BALL_SPEED = 4.8;
 
 /**
  * Restitution alone only ever removes energy, so the ball dies out mid-table. Every
@@ -111,8 +111,8 @@ const BOUNCE_BOOST: Record<BrickKind, number> = {
 };
 const HANDLER_BOOST = 1.2;
 const CUSHION_BOOST = 1.06;
-const MIN_SPEED = 4.6;
-const MAX_SPEED = 9;
+const MIN_SPEED = 4;
+const MAX_SPEED = 8;
 
 /**
  * Bounce and grip per material. Glass rings and keeps the ball fast, clay deadens it,
@@ -224,28 +224,37 @@ function Rivets() {
   );
 }
 
-function BrickWall({ bricks }: { bricks: BrickSpec[] }) {
-  const materials = useMemo(() => {
-    const out = {} as Record<BrickKind, THREE.MeshStandardMaterial>;
-    (Object.keys(BRICK_LOOK) as BrickKind[]).forEach((kind) => {
-      const look = BRICK_LOOK[kind];
-      const textures = makeBrickTextures(kind);
-      out[kind] = new THREE.MeshStandardMaterial({
-        map: textures.map,
-        roughnessMap: textures.roughnessMap,
-        bumpMap: textures.bumpMap,
-        bumpScale: look.bumpScale,
-        roughness: look.roughness,
-        metalness: look.metalness,
-        transparent: look.opacity !== undefined,
-        opacity: look.opacity ?? 1,
-        emissive: look.emissive ?? "#000000",
-        emissiveIntensity: look.emissiveIntensity ?? 0,
-        envMapIntensity: look.envMapIntensity ?? 0.7,
-      });
+let brickMaterials: Record<BrickKind, THREE.MeshStandardMaterial> | null = null;
+
+/** One material per kind, built once and shared by the wall and the handler. */
+function getBrickMaterials(): Record<BrickKind, THREE.MeshStandardMaterial> {
+  if (brickMaterials) return brickMaterials;
+
+  const built = {} as Record<BrickKind, THREE.MeshStandardMaterial>;
+  (Object.keys(BRICK_LOOK) as BrickKind[]).forEach((kind) => {
+    const look = BRICK_LOOK[kind];
+    const textures = makeBrickTextures(kind);
+    built[kind] = new THREE.MeshStandardMaterial({
+      map: textures.map,
+      roughnessMap: textures.roughnessMap,
+      bumpMap: textures.bumpMap,
+      bumpScale: look.bumpScale,
+      roughness: look.roughness,
+      metalness: look.metalness,
+      transparent: look.opacity !== undefined,
+      opacity: look.opacity ?? 1,
+      emissive: look.emissive ?? "#000000",
+      emissiveIntensity: look.emissiveIntensity ?? 0,
+      envMapIntensity: look.envMapIntensity ?? 0.7,
     });
-    return out;
-  }, []);
+  });
+
+  brickMaterials = built;
+  return built;
+}
+
+function BrickWall({ bricks }: { bricks: BrickSpec[] }) {
+  const materials = useMemo(() => getBrickMaterials(), []);
 
   return (
     <group>
@@ -356,6 +365,8 @@ function Handler() {
     };
   }, [camera, gl, raycaster, plane, pointer, hit]);
 
+  const gold = useMemo(() => getBrickMaterials().gold, []);
+
   useFrame(() => {
     if (group.current) group.current.position.z = shared.handlerZ;
   });
@@ -369,15 +380,17 @@ function Handler() {
         castShadow
         receiveShadow
       >
-        <meshStandardMaterial color="#2a2118" roughness={0.45} metalness={0.25} />
+        <primitive object={gold} attach="material" />
       </RoundedBox>
+      {/* A polished edge, so the bar still reads as the thing you control. */}
       <mesh position={[0, 0.03, 0]}>
-        <boxGeometry args={[0.072, 0.008, HANDLER_HALF * 2 + 0.002]} />
+        <boxGeometry args={[0.074, 0.008, HANDLER_HALF * 2 + 0.002]} />
         <meshStandardMaterial
-          color="#7fd8ff"
-          emissive="#2aa6d6"
-          emissiveIntensity={1.4}
-          roughness={0.3}
+          color="#ffe9ab"
+          emissive="#6a4c12"
+          emissiveIntensity={0.9}
+          metalness={1}
+          roughness={0.12}
         />
       </mesh>
     </group>
