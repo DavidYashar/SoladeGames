@@ -23,6 +23,7 @@ const CABINETS: CabinetEntry[] = [
   },
   {
     name: "Brick Blitz",
+    route: "/games/brick-blitz",
     control: "Drag the paddle",
     accent: "ocean",
     kind: "brick",
@@ -75,7 +76,7 @@ export function HallHero() {
         <h2 className="font-display text-[11px] uppercase tracking-[0.25em] text-zinc-500">
           The hall
         </h2>
-        <p className="text-xs text-zinc-600">Stack Tower is live · three more in the works</p>
+        <p className="text-xs text-zinc-600">Two cabinets live · two in the works</p>
       </div>
 
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">
