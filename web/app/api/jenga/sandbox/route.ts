@@ -21,8 +21,8 @@ export async function GET(request: Request) {
   const mode = url.searchParams.get("mode");
 
   try {
-    if (mode === "policy" || mode === "random") {
-      return NextResponse.json(await runPolicySandbox(trials, pulls, mode === "random"));
+    if (mode === "policy" || mode === "random" || mode === "mixed") {
+      return NextResponse.json(await runPolicySandbox(trials, pulls, mode === "random", mode === "mixed"));
     }
     return NextResponse.json(await runSandbox(trials, pulls));
   } catch (error) {

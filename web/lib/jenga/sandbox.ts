@@ -7,7 +7,7 @@
  */
 
 import { JengaSim } from "./sim";
-import { choosePlacement, choosePull } from "./policy";
+import { choosePlacement, chooseVerifiedMove } from "./policy";
 import { LAYERS, isTopLayer } from "./tower";
 
 /** Small deterministic PRNG so a run can be repeated exactly. */
@@ -58,7 +58,7 @@ export interface SandboxReport {
  * Same experiment, but both sides play the math model. This is how the opponent is
  * judged: if it cannot outlast random play, the weights are wrong.
  */
-export async function runPolicySandbox(trials = 4, turns = 40, randomize = false): Promise<{
+export async function runPolicySandbox(trials = 4, turns = 40, randomize = false, mixed = false): Promise<{
   trials: number;
   turns: number;
   collapses: number;
@@ -76,13 +76,16 @@ export async function runPolicySandbox(trials = 4, turns = 40, randomize = false
     let collapsedAt: number | null = null;
 
     for (let t = 0; t < turns; t++) {
-      if (randomize) {
+      const playerTurn = t % 2 === 0;
+      const useRandom = randomize || (mixed && playerTurn);
+
+      if (useRandom) {
         const legal = sim.planks.filter((p) => !p.removed && p.layer < 17 &&
           sim.planks.filter((q) => q.layer === p.layer && !q.removed).length > 1);
         if (legal.length === 0) break;
         sim.beginPull(legal[Math.floor(Math.random() * legal.length)].id, 1);
       } else {
-        const move = choosePull(sim);
+        const move = chooseVerifiedMove(sim);
         if (!move) break;
         sim.beginPull(move.plankId, 1);
       }
@@ -93,7 +96,7 @@ export async function runPolicySandbox(trials = 4, turns = 40, randomize = false
       }
       const options = sim.placementOptions();
       if (options.length === 0) break;
-      sim.place(randomize ? options[Math.floor(Math.random() * options.length)] : choosePlacement(sim, options));
+      sim.place(useRandom ? options[Math.floor(Math.random() * options.length)] : choosePlacement(sim, options));
       sim.settle(0.7);
       if (sim.fallen().length > baseline) {
         collapsedAt = t + 1;

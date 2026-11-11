@@ -5,6 +5,7 @@
 
 import RAPIER from "@dimforge/rapier3d-compat";
 
+import { capture, restore, type Pose } from "./state";
 import {
   GAP,
   PULL_DISTANCE,
@@ -96,8 +97,7 @@ export class JengaSim {
         RAPIER.RigidBodyDesc.dynamic()
           .setTranslation(p.x, p.y, p.z)
           .setLinearDamping(0.08)
-          .setAngularDamping(0.35)
-          .setCcdEnabled(true),
+          .setAngularDamping(0.35),
       );
       world.createCollider(
         RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
@@ -179,8 +179,7 @@ export class JengaSim {
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(opt.x, opt.y, opt.z)
         .setLinearDamping(0.08)
-        .setAngularDamping(0.35)
-        .setCcdEnabled(true),
+        .setAngularDamping(0.35),
     );
     const he = halfExtents(opt.alongX);
     this.world.createCollider(
@@ -298,6 +297,72 @@ export class JengaSim {
     return true;
   }
 
+  /** Live position of a plank's body. Physics moves planks, layout does not. */
+  pose(id: number): Pose | null {
+    const body = this.body(id);
+    if (!body) return null;
+    const t = body.translation();
+    return { x: t.x, y: t.y, z: t.z };
+  }
+
+  /** Every surviving plank with its live position. */
+  livePoses(): Map<number, Pose> {
+    const out = new Map<number, Pose>();
+    for (const p of this.planks) {
+      if (p.removed) continue;
+      const pose = this.pose(p.id);
+      if (pose) out.set(p.id, pose);
+    }
+    return out;
+  }
+
+  /**
+   * Tries a removal without committing to it: snapshot every body, lift the candidate
+   * out of the tower, step the solver, measure how much moved, then restore.
+   */
+  probe(plankId: number, ticks = 45): { fallen: number; maxDisp: number; poses: Map<number, Pose> } {
+    const snap = capture(this.bodies);
+    const before = this.fallen().length;
+
+    const body = this.body(plankId);
+    const collider = body?.collider(0);
+    const wasSensor = collider?.isSensor() ?? false;
+
+    if (body && collider) {
+      const t = body.translation();
+      collider.setSensor(true);
+      body.setTranslation({ x: t.x, y: t.y + 30, z: t.z }, true);
+      body.wakeUp();
+    }
+
+    for (let i = 0; i < ticks; i++) this.world.step();
+
+    const fallen = this.fallen().length - before;
+    let maxDisp = 0;
+    for (const [id, b] of this.bodies) {
+      const s = snap.get(id);
+      if (!s || id === plankId) continue;
+      const t = b.translation();
+      maxDisp = Math.max(maxDisp, Math.hypot(t.x - s.x, t.y - s.y, t.z - s.z));
+    }
+
+    // Capture the resulting tower before undoing the probe: the opponent judges the
+    // position it is moving into, not just how much it jiggled.
+    const poses = new Map<number, Pose>();
+    for (const [id, b] of this.bodies) {
+      if (id === plankId) continue;
+      const t = b.translation();
+      poses.set(id, { x: t.x, y: t.y, z: t.z });
+    }
+
+    restore(this.bodies, snap);
+    if (body && collider) {
+      collider.setSensor(wasSensor);
+      body.wakeUp();
+    }
+
+    return { fallen, maxDisp: Number(maxDisp.toFixed(3)), poses };
+  }
   /** Planks that have left the tower and dropped below the table. */
   fallen(): number[] {
     const out: number[] = [];

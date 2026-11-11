@@ -8,7 +8,7 @@ import type { Mesh } from "three";
 
 import { DT, JengaSim, type Placement } from "@/lib/jenga/sim";
 import { LAYERS, PLANK, halfExtents, isTopLayer } from "@/lib/jenga/tower";
-import { choosePlacement, choosePull, rankMoves } from "@/lib/jenga/policy";
+import { choosePlacement, chooseVerifiedMove, rankMoves } from "@/lib/jenga/policy";
 
 const WOOD = "#d8a45e";
 const WOOD_DARK = "#a9762f";
@@ -78,6 +78,9 @@ function Scene({
   const tickMatch = (now: number) => {
     const m = match.current;
     if (m.phase === "over") return;
+    // Never decide while a pull is animating: the decision costs eight physics probes,
+    // so running it per frame stalls the whole scene.
+    if (sim.pulling) return;
 
     if (m.phase === "place") {
       // Player is choosing; nothing to do until they click.
@@ -92,7 +95,7 @@ function Scene({
       }
       // The opponent is the math model in lib/jenga/policy.ts: geometry and mass,
       // no learning, no randomness.
-      const move = choosePull(sim);
+      const move = chooseVerifiedMove(sim);
       if (!move) {
         finish("machine");
         return;

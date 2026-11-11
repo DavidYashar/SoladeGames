@@ -1,59 +1,67 @@
 /**
  * The opponent's decision model.
  *
- * This is arithmetic, not learning. Every move is scored from the tower's geometry:
- * where the mass above a plank sits, how much support is left if the plank goes, and
- * how much load that plank is carrying. The same position always produces the same
- * choice, which is what makes the opponent testable and replayable.
+ * No learning, no randomness. Two stages, both arithmetic:
+ *
+ *  1. Rank every legal plank by a closed-form risk score built from the tower's
+ *     CURRENT geometry: where the mass above sits relative to the support left behind.
+ *  2. Verify the best few by actually simulating the removal on a snapshot and
+ *     restoring. Only moves that leave the tower still are considered.
+ *
+ * Stage 2 is what makes it hard to beat: the formula can be wrong about a particular
+ * tower, but the probe cannot, because it is the same solver the game runs on.
  */
 
 import { LAYERS, PLANK, isTopLayer } from "./tower";
 import type { JengaSim, Placement } from "./sim";
+import type { Pose } from "./state";
 
 export interface ScoredMove {
   plankId: number;
   layer: number;
   slot: number;
-  /** Predicted outcome numbers, kept for display and debugging. */
   margin: number;
   massAbove: number;
   supportLeft: number;
   risk: number;
+  /** Filled in by the verification stage. */
+  probeDisp: number | null;
+  probeFallen: number | null;
 }
 
-/** Half extents in the horizontal plane, for support arithmetic. */
 function footprint(alongX: boolean) {
   return alongX
     ? { hx: PLANK.l / 2, hz: PLANK.w / 2 }
     : { hx: PLANK.w / 2, hz: PLANK.l / 2 };
 }
 
-interface Above {
-  comX: number;
-  comZ: number;
-  count: number;
-}
-
-/** Centre of mass of every plank above a given layer, assuming equal mass. */
-function massAbove(sim: JengaSim, layer: number): Above {
+function massAbove(
+  sim: JengaSim,
+  poses: Map<number, Pose>,
+  layer: number,
+): { comX: number; comZ: number; count: number } {
   let x = 0;
   let z = 0;
   let count = 0;
   for (const p of sim.planks) {
     if (p.removed || p.layer <= layer) continue;
-    x += p.x;
-    z += p.z;
+    const pose = poses.get(p.id);
+    if (!pose) continue;
+    x += pose.x;
+    z += pose.z;
     count += 1;
   }
-  return count === 0 ? { comX: 0, comZ: 0, count: 0 } : { comX: x / count, comZ: z / count, count };
+  return count === 0
+    ? { comX: 0, comZ: 0, count: 0 }
+    : { comX: x / count, comZ: z / count, count };
 }
 
-/**
- * The support footprint left in a layer once one plank is taken out.
- * The planks above act as a plate, so the hull is the bounding rectangle of the
- * remaining planks rather than a set of disconnected strips.
- */
-function supportBounds(sim: JengaSim, layer: number, excludeId: number) {
+function supportBounds(
+  sim: JengaSim,
+  poses: Map<number, Pose>,
+  layer: number,
+  excludeId: number,
+) {
   let minX = Infinity;
   let maxX = -Infinity;
   let minZ = Infinity;
@@ -62,11 +70,13 @@ function supportBounds(sim: JengaSim, layer: number, excludeId: number) {
 
   for (const p of sim.planks) {
     if (p.removed || p.layer !== layer || p.id === excludeId) continue;
+    const pose = poses.get(p.id);
+    if (!pose) continue;
     const { hx, hz } = footprint(p.alongX);
-    minX = Math.min(minX, p.x - hx);
-    maxX = Math.max(maxX, p.x + hx);
-    minZ = Math.min(minZ, p.z - hz);
-    maxZ = Math.max(maxZ, p.z + hz);
+    minX = Math.min(minX, pose.x - hx);
+    maxX = Math.max(maxX, pose.x + hx);
+    minZ = Math.min(minZ, pose.z - hz);
+    maxZ = Math.max(maxZ, pose.z + hz);
     count += 1;
   }
 
@@ -74,12 +84,42 @@ function supportBounds(sim: JengaSim, layer: number, excludeId: number) {
 }
 
 /**
- * Scores every plank the rules allow. Lower risk is safer.
- *
- * The weights are the model. A negative margin means the mass above no longer sits
- * over anything, which is a certain collapse and is ranked last regardless.
+ * The worst support margin anywhere in a given tower state. This is the number the
+ * opponent maximizes: not "how little did it move", but "how well supported is the
+ * tower I am leaving behind".
  */
-export function rankMoves(sim: JengaSim, limit = 6): ScoredMove[] {
+export function worstMargin(
+  sim: JengaSim,
+  poses: Map<number, Pose>,
+  excludeId: number,
+): number {
+  let worst = Infinity;
+
+  for (const p of sim.planks) {
+    if (p.removed || p.id === excludeId) continue;
+    const pose = poses.get(p.id);
+    if (!pose || pose.y < -0.9) continue;
+
+    const above = massAbove(sim, poses, p.layer);
+    if (above.count === 0) continue;
+
+    const bounds = supportBounds(sim, poses, p.layer, excludeId);
+    if (!bounds) return -Infinity;
+
+    const margin = Math.min(
+      above.comX - bounds.minX,
+      bounds.maxX - above.comX,
+      above.comZ - bounds.minZ,
+      bounds.maxZ - above.comZ,
+    );
+    worst = Math.min(worst, margin);
+  }
+
+  return worst === Infinity ? 0 : Number(worst.toFixed(3));
+}
+/** Closed-form ranking, read from live body positions. */
+export function rankMoves(sim: JengaSim, limit = 8): ScoredMove[] {
+  const poses = sim.livePoses();
   const moves: ScoredMove[] = [];
 
   for (const plank of sim.planks) {
@@ -90,10 +130,10 @@ export function rankMoves(sim: JengaSim, limit = 6): ScoredMove[] {
     ).length;
     if (leftInLayer === 0) continue;
 
-    const bounds = supportBounds(sim, plank.layer, plank.id);
+    const bounds = supportBounds(sim, poses, plank.layer, plank.id);
+    const above = massAbove(sim, poses, plank.layer);
     if (!bounds) continue;
 
-    const above = massAbove(sim, plank.layer);
     const margin = Math.min(
       above.comX - bounds.minX,
       bounds.maxX - above.comX,
@@ -101,16 +141,15 @@ export function rankMoves(sim: JengaSim, limit = 6): ScoredMove[] {
       bounds.maxZ - above.comZ,
     );
 
-    // Higher layers carry less, so they are cheaper to disturb.
     const heightFactor = plank.layer / Math.max(1, LAYERS - 1);
     const load = above.count / 54;
 
     let risk = 0;
-    risk -= margin * 2.2; // a wide margin is the single best predictor of survival
-    risk += load * 3.0; // more mass above, more to lose
-    risk += (3 - leftInLayer) * 1.1; // a layer down to one plank is fragile
-    risk -= heightFactor * 1.6; // pulling high is safer
-    if (margin < 0) risk += 1000; // unsupported: never choose it
+    risk -= margin * 2.2;
+    risk += load * 3.0;
+    risk += (3 - leftInLayer) * 1.1;
+    risk -= heightFactor * 1.6;
+    if (margin < 0) risk += 1000;
 
     moves.push({
       plankId: plank.id,
@@ -120,6 +159,8 @@ export function rankMoves(sim: JengaSim, limit = 6): ScoredMove[] {
       massAbove: above.count,
       supportLeft: leftInLayer,
       risk: Number(risk.toFixed(3)),
+      probeDisp: null,
+      probeFallen: null,
     });
   }
 
@@ -127,9 +168,42 @@ export function rankMoves(sim: JengaSim, limit = 6): ScoredMove[] {
 }
 
 /**
- * Placement choice. Keep the mass centred and, on a fresh layer, lay the plank
- * across the one below so the bond stays interlocked.
+ * Ranking plus verification. Every candidate is simulated on a snapshot; the winner
+ * is the move that disturbs the tower least, with the formula as tie-break.
  */
+export function chooseVerifiedMove(sim: JengaSim, ticks = 45): ScoredMove | null {
+  // Eight candidates, 45 ticks each. Tried 4x30 to speed it up and it lost two of two
+  // runs, so the depth is load-bearing: shallow probes miss slow collapses.
+  const ranked = rankMoves(sim, 8);
+  if (ranked.length === 0) return null;
+
+  const probed = ranked.map((move) => {
+    const result = sim.probe(move.plankId, ticks);
+    const after = worstMargin(sim, result.poses, move.plankId);
+    return {
+      ...move,
+      probeDisp: result.maxDisp,
+      probeFallen: result.fallen,
+      afterMargin: after,
+    };
+  });
+
+  // A move survives only if nothing fell AND the tower it leaves is still supported.
+  const safe = probed.filter(
+    (m) => m.probeFallen === 0 && (m.probeDisp ?? 1) < 0.5 && (m.afterMargin ?? -Infinity) > 0.15,
+  );
+  const pool = safe.length > 0 ? safe : probed;
+
+  // Maximize the stability of the resulting tower; break ties by the closed-form risk.
+  pool.sort((a, b) => {
+    const d = (b.afterMargin ?? -Infinity) - (a.afterMargin ?? -Infinity);
+    return Math.abs(d) > 0.02 ? d : a.risk - b.risk;
+  });
+
+  return pool[0];
+}
+
+/** Placement choice: centred, and across the layer below on a fresh layer. */
 export function choosePlacement(sim: JengaSim, options: Placement[]): Placement {
   if (options.length === 0) throw new Error("no placement options");
 
@@ -139,18 +213,10 @@ export function choosePlacement(sim: JengaSim, options: Placement[]): Placement 
 
   const score = (o: Placement) => {
     let s = 0;
-    // Centred is best: slot 1 sits over the middle of the tower.
     s -= Math.abs(o.slot - 1) * 2;
-    // On a new layer, crossing the layer below locks the tower.
     if (o.layer > top && topAlongX !== null) s += o.alongX !== topAlongX ? 3 : 0;
     return s;
   };
 
   return options.reduce((best, o) => (score(o) > score(best) ? o : best), options[0]);
-}
-
-/** The opponent's whole turn, as plain functions. */
-export function choosePull(sim: JengaSim): ScoredMove | null {
-  const ranked = rankMoves(sim, 1);
-  return ranked.length > 0 ? ranked[0] : null;
 }
