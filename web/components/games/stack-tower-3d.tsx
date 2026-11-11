@@ -62,9 +62,14 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
 
   const match = useRef<MatchRef>({ turn: "player", phase: "pull", loser: null, actAt: 0 });
 
-  const [held, setHeld] = useState<Held | null>(null);
+  // The carried plank lives in a ref with an explicit re-render. Keeping it in React
+  // state alone let the update be dropped between frames, so the plank never appeared.
   const heldRef = useRef<Held | null>(null);
-  heldRef.current = held;
+  const [, bumpHeld] = useState(0);
+  const setHeld = (next: Held | null) => {
+    heldRef.current = next;
+    bumpHeld((n) => n + 1);
+  };
 
   const carrying = useRef(false);
   const pendingAlongX = useRef(true);
@@ -95,11 +100,14 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
     return false;
   };
 
+  const placementCount = useRef(0);
   const beginPlacement = () => {
+    placementCount.current += 1;
     const layer = sim.topLayer() + 1;
     const topY = PLANK.h / 2 + layer * PLANK.h;
     dropPlane.current.constant = -topY;
-    // Carry it at its landing height, so the drop is what you see.\n    setHeld({ alongX: pendingAlongX.current, x: 0, z: 0, y: topY });
+    // Carry it at its landing height, so the drop is what you see.
+    setHeld({ alongX: pendingAlongX.current, x: 0, z: 0, y: topY });
     match.current.phase = "place";
     publish();
   };
@@ -128,15 +136,14 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
       raycaster.setFromCamera(ndc, camera);
       const hit = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(dropPlane.current, hit)) {
-        setHeld((prev) =>
-          prev
-            ? {
-                ...prev,
-                x: THREE.MathUtils.clamp(hit.x, -CARRY_LIMIT, CARRY_LIMIT),
-                z: THREE.MathUtils.clamp(hit.z, -CARRY_LIMIT, CARRY_LIMIT),
-              }
-            : prev,
-        );
+        const prev = heldRef.current;
+        if (prev) {
+          setHeld({
+            ...prev,
+            x: THREE.MathUtils.clamp(hit.x, -CARRY_LIMIT, CARRY_LIMIT),
+            z: THREE.MathUtils.clamp(hit.z, -CARRY_LIMIT, CARRY_LIMIT),
+          });
+        }
       }
     };
 
@@ -158,7 +165,8 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "r") return;
-      setHeld((prev) => (prev ? { ...prev, alongX: !prev.alongX } : prev));
+      const prev = heldRef.current;
+      if (prev) setHeld({ ...prev, alongX: !prev.alongX });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -170,6 +178,7 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
     drop: (_x: number, _z: number, _alongX: boolean) => {},
     rank: () => [] as unknown,
     heldScreen: () => null as { x: number; y: number } | null,
+    heldRaw: () => ({} as unknown),
   });
   debug.current.state = () => ({
     turn: match.current.turn,
@@ -178,6 +187,7 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
   });
   debug.current.drop = (x, z, alongX) => dropHeld.current({ x, z, alongX });
   debug.current.rank = () => rankMoves(sim, 3);
+  debug.current.heldRaw = () => ({ held: heldRef.current, placements: placementCount.current, phase: match.current.phase });
   debug.current.heldScreen = () => {
     const h = heldRef.current;
     if (!h) return null;
@@ -272,6 +282,7 @@ function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => vo
     sim.beginPull(id, 1);
   };
 
+  const held = heldRef.current;
   const heldHe = held ? halfExtents(held.alongX) : null;
 
   return (
