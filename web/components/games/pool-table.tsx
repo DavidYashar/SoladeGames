@@ -9,85 +9,27 @@ import * as THREE from "three";
 import { makeWoodTextures } from "@/lib/jenga/wood";
 
 /**
- * Billiard table, environment only. No physics and no rules yet: this is the room,
- * the table and the balls, seen from where a player stands.
+ * Billiard table, environment only.
  *
- * Dimensions are real: an 8-foot table plays 2.24 m by 1.12 m, the balls are 57 mm,
- * and the bed sits 0.78 m off the floor.
+ * Real dimensions: an 8-foot table plays 2.24 m by 1.12 m and the bed sits 0.78 m off
+ * the floor. The camera stands at one short end and looks down the length of the table,
+ * the way a player stands behind the break.
  */
 
 const BED = { w: 2.24, d: 1.12, y: 0.78 };
 const RAIL = 0.1;
 const RAIL_H = 0.085;
 const CUSHION = 0.045;
-const BALL_R = 0.0286;
 
 const FELT = "#1f6b45";
 const FELT_DARK = "#175236";
 const CLOTH_ROUGHNESS = 0.95;
 
-/** Classic ball set. Solids 1-7, 8 black, stripes 9-15. */
-const BALL_COLORS: { id: number; color: string; stripe: boolean }[] = [
-  { id: 1, color: "#e8b422", stripe: false },
-  { id: 2, color: "#1f4fa8", stripe: false },
-  { id: 3, color: "#c22a2a", stripe: false },
-  { id: 4, color: "#5b2b8a", stripe: false },
-  { id: 5, color: "#e2731f", stripe: false },
-  { id: 6, color: "#1f7a4a", stripe: false },
-  { id: 7, color: "#7a2d2d", stripe: false },
-  { id: 8, color: "#141414", stripe: false },
-  { id: 9, color: "#e8b422", stripe: true },
-  { id: 10, color: "#1f4fa8", stripe: true },
-  { id: 11, color: "#c22a2a", stripe: true },
-  { id: 12, color: "#5b2b8a", stripe: true },
-  { id: 13, color: "#e2731f", stripe: true },
-  { id: 14, color: "#1f7a4a", stripe: true },
-  { id: 15, color: "#7a2d2d", stripe: true },
-];
-
-/** Rack: apex ball nearest the cue ball, rows widening away from it. */
-function rackPositions(): { x: number; z: number }[] {
-  const out: { x: number; z: number }[] = [];
-  const apexX = BED.w / 2 - 0.36;
-  const dx = BALL_R * 2 * 0.866;
-  for (let row = 0; row < 5; row++) {
-    for (let i = 0; i <= row; i++) {
-      out.push({
-        x: apexX + row * dx,
-        z: (i - row / 2) * (BALL_R * 2.02),
-      });
-    }
-  }
-  return out;
-}
-
-function Ball({ color, stripe, x, z }: { color: string; stripe: boolean; x: number; z: number }) {
-  return (
-    <group position={[x, BED.y + BALL_R, z]}>
-      <mesh castShadow receiveShadow>
-        <sphereGeometry args={[BALL_R, 48, 32]} />
-        <meshStandardMaterial color={color} roughness={0.18} metalness={0.02} envMapIntensity={0.6} />
-      </mesh>
-      {stripe ? (
-        <mesh rotation={[0, 0, Math.PI / 2]} scale={[1.001, 1.001, 1.001]}>
-          <cylinderGeometry args={[BALL_R * 0.999, BALL_R * 0.999, BALL_R * 1.02, 48, 1, true]} />
-          <meshStandardMaterial color="#f4f1e6" roughness={0.22} transparent opacity={0.55} />
-        </mesh>
-      ) : null}
-    </group>
-  );
-}
-
-function Pocket({ x, z }: { x: number; z: number }) {
-  return (
-    <mesh position={[x, BED.y + 0.002, z]} rotation={[Math.PI / 2, 0, 0]}>
-      <cylinderGeometry args={[0.062, 0.062, 0.06, 28]} />
-      <meshStandardMaterial color="#050505" roughness={0.95} metalness={0} />
-    </mesh>
-  );
-}
-
 function Table() {
+  const { w, d, y } = BED;
+  const outerW = w + RAIL * 2;
+  const outerD = d + RAIL * 2;
+
   const textures = useMemo(() => makeWoodTextures(), []);
   const wood = useMemo(
     () =>
@@ -100,22 +42,6 @@ function Table() {
       }),
     [textures],
   );
-  const { w, d, y } = BED;
-  const outerW = w + RAIL * 2;
-  const outerD = d + RAIL * 2;
-
-  const pockets = useMemo(() => {
-    const halfW = w / 2;
-    const halfD = d / 2;
-    return [
-      [-halfW, -halfD],
-      [halfW, -halfD],
-      [-halfW, halfD],
-      [halfW, halfD],
-      [0, -halfD],
-      [0, halfD],
-    ] as [number, number][];
-  }, [w, d]);
 
   return (
     <group>
@@ -164,10 +90,6 @@ function Table() {
         </mesh>
       ))}
 
-      {pockets.map(([px, pz], i) => (
-        <Pocket key={i} x={px} z={pz} />
-      ))}
-
       {/* Apron and legs. */}
       <mesh position={[0, y - 0.11, 0]} castShadow receiveShadow>
         <boxGeometry args={[outerW + 0.02, 0.16, outerD + 0.02]} />
@@ -189,28 +111,26 @@ function Table() {
 }
 
 export function PoolTable() {
-  const rack = useMemo(() => rackPositions(), []);
-
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#050506]">
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0, 1.62, 2.85], fov: 46, near: 0.05, far: 60 }}
+        camera={{ position: [2.1, 4.42, 0], fov: 42, near: 0.05, far: 60 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
         onCreated={({ camera }) => camera.lookAt(0, BED.y + 0.02, 0)}
       >
         <color attach="background" args={["#050506"]} />
         <fog attach="fog" args={["#050506", 6, 22]} />
 
-        <ambientLight intensity={0.22} />
+        <ambientLight intensity={0.3} />
 
         {/* Two lamps over the bed, as a pool room has. */}
         <spotLight
           position={[-0.62, 2.25, 0.05]}
           angle={0.72}
           penumbra={0.75}
-          intensity={38}
+          intensity={17}
           distance={4.6}
           decay={2}
           color="#fff6e2"
@@ -221,7 +141,7 @@ export function PoolTable() {
           position={[0.62, 2.25, 0.05]}
           angle={0.72}
           penumbra={0.75}
-          intensity={38}
+          intensity={17}
           distance={4.6}
           decay={2}
           color="#fff6e2"
@@ -229,14 +149,21 @@ export function PoolTable() {
           target-position={[0.62, BED.y, 0.05]}
         />
 
+        <spotLight
+          position={[0, 2.35, 0]}
+          angle={0.8}
+          penumbra={0.8}
+          intensity={16}
+          distance={5}
+          decay={2}
+          color="#fff6e2"
+          castShadow={false}
+          target-position={[0, BED.y, 0]}
+        />
+
         <directionalLight position={[1.3, 2.6, 1.4]} intensity={0.85} color="#ffe9c8" castShadow />
 
         <Table />
-
-        <Ball color="#f7f4ea" stripe={false} x={-BED.w / 2 + 0.3} z={0.02} />
-        {BALL_COLORS.map((b, i) => (
-          <Ball key={b.id} color={b.color} stripe={b.stripe} x={rack[i].x} z={rack[i].z} />
-        ))}
 
         {/* Room floor, dark, so the table reads as an object in a space. */}
         <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
