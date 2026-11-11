@@ -16,7 +16,7 @@ import { makeWoodTextures } from "@/lib/jenga/wood";
  * the way a player stands behind the break.
  */
 
-const BED = { w: 2.24, d: 1.4, y: 0.78 };
+const BED = { w: 2.24, d: 1.58, y: 0.78 };
 const RAIL = 0.1;
 const RAIL_H = 0.085;
 const CUSHION = 0.045;
