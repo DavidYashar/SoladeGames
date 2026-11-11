@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type Accent = "sky" | "ocean" | "ice" | "indigo";
@@ -8,12 +7,10 @@ type Kind = "tower" | "brick" | "bubble" | "pinball";
 
 interface CabinetProps {
   name: string;
-  route: string;
   control: string;
   accent: Accent;
   kind: Kind;
   bestKey: string;
-  host?: boolean;
 }
 
 const ACCENT: Record<
@@ -122,12 +119,10 @@ function PinballScene() {
 
 export function CabinetPreview({
   name,
-  route,
   control,
   accent,
   kind,
   bestKey,
-  host,
 }: CabinetProps) {
   const [best, setBest] = useState<number | null>(null);
 
@@ -139,8 +134,7 @@ export function CabinetPreview({
   const a = ACCENT[accent];
 
   return (
-    <Link
-      href={route}
+    <div
       className={`group relative flex h-full w-full flex-col overflow-hidden rounded-sm border-2 border-white/10 bg-[#0e0e16] shadow-[inset_2px_2px_0_0_rgba(255,255,255,0.10),inset_-2px_-2px_0_0_rgba(0,0,0,0.9),0_6px_0_-1px_#05050a,0_14px_26px_-12px_rgba(0,0,0,0.9)] transition-all motion-safe:hover:-translate-y-1.5 motion-safe:hover:shadow-[inset_2px_2px_0_0_rgba(255,255,255,0.16),inset_-2px_-2px_0_0_rgba(0,0,0,0.9),0_9px_0_-1px_#05050a,0_20px_32px_-12px_rgba(34,224,255,0.28)] ${a.neon} neon-edge ${a.hover} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8fc0e8]`}
     >
       {/* Marquee */}
@@ -164,13 +158,8 @@ export function CabinetPreview({
       {/* Control deck */}
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-3">
         <span className="rounded-md bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
-          Free practice
+          3D rebuild
         </span>
-        {host && (
-          <span className="rounded-md bg-[#5b9fd8]/20 px-2.5 py-1 text-[10px] font-semibold text-[#a9d4f0]">
-            Tonight · 1 USDC
-          </span>
-        )}
         {best != null && (
           <span className="ml-auto text-[10px] text-zinc-500">
             Best{" "}
@@ -178,6 +167,6 @@ export function CabinetPreview({
           </span>
         )}
       </div>
-    </Link>
+    </div>
   );
 }

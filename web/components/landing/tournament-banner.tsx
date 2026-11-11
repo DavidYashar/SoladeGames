@@ -31,7 +31,7 @@ export function TournamentBanner() {
               <span className="font-semibold text-[#c9e2f5]">60% of the pot</span>.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Link href="/games/stack-tower" className="arcade-btn">
+              <Link href="#machines" className="arcade-btn">
                 Practice the board
               </Link>
               <Link href="#money" className="arcade-btn-ghost">

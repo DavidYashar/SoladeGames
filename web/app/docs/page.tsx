@@ -8,28 +8,24 @@ const GAMES = [
   {
     name: "Stack Tower",
     machine: "Tower Machine",
-    route: "/games/stack-tower",
     desc: "Tap to drop. Perfect alignment keeps your width.",
     identity: "Precision & timing",
   },
   {
     name: "Brick Blitz",
     machine: "Brick Machine",
-    route: "/games/brick-blitz",
     desc: "Paddle breaker with seeded walls and combos.",
     identity: "Waves, survival & power-ups",
   },
   {
     name: "Bubble Pop",
     machine: "Bubble Machine",
-    route: "/games/bubble-pop",
     desc: "Aim, shoot, chain pops — the king of one more round.",
     identity: "Efficiency & chain reactions",
   },
   {
     name: "Neon Pinball",
     machine: "Pinball Machine",
-    route: "/games/pinball",
     desc: "Real physics: flippers, bumpers, spin, and a plunger.",
     identity: "Momentum, physics & combo mastery",
   },
@@ -135,9 +131,8 @@ export default function DocsPage() {
           <p className="mb-3">Four machines, each with a daily-seeded board that is identical for every player. Each one also maps to a machine NFT type.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {GAMES.map((g) => (
-              <Link
+              <div
                 key={g.name}
-                href={g.route}
                 className="rounded-lg bg-white/[0.02] p-4 transition-colors hover:bg-[#5b9fd8]/10 hover:text-[#a9d4f0]"
               >
                 <div className="flex items-center justify-between">
@@ -146,7 +141,7 @@ export default function DocsPage() {
                 </div>
                 <p className="mt-1 text-sm text-zinc-500">{g.desc}</p>
                 <p className="mt-1 text-xs text-zinc-600">{g.identity}</p>
-              </Link>
+              </div>
             ))}
           </div>
         </Section>

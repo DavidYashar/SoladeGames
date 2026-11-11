@@ -3,16 +3,13 @@ import { CabinetPreview } from "./cabinet-preview";
 const CABINETS = [
   {
     name: "Stack Tower",
-    route: "/games/stack-tower",
     control: "Tap to drop",
     accent: "sky",
     kind: "tower",
     bestKey: "imarket:stack-tower:best",
-    host: true,
   },
   {
     name: "Brick Blitz",
-    route: "/games/brick-blitz",
     control: "Drag the paddle",
     accent: "ocean",
     kind: "brick",
@@ -20,7 +17,6 @@ const CABINETS = [
   },
   {
     name: "Bubble Pop",
-    route: "/games/bubble-pop",
     control: "Aim · shoot · chain",
     accent: "ice",
     kind: "bubble",
@@ -28,7 +24,6 @@ const CABINETS = [
   },
   {
     name: "Neon Pinball",
-    route: "/games/pinball",
     control: "Flippers · plunger",
     accent: "indigo",
     kind: "pinball",
@@ -54,8 +49,8 @@ export function HallHero() {
           wins.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a href="/games/stack-tower" className="arcade-btn">
-            Play free
+          <a href="#machines" className="arcade-btn">
+            Browse the machines
           </a>
           <a href="/play" className="arcade-btn-ghost">
             Today&apos;s puzzle
@@ -67,7 +62,7 @@ export function HallHero() {
         <h2 className="font-display text-[11px] uppercase tracking-[0.25em] text-zinc-500">
           The hall
         </h2>
-        <p className="text-xs text-zinc-600">Enter a cabinet to practice</p>
+        <p className="text-xs text-zinc-600">Rebuilding in 3D</p>
       </div>
 
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">
