@@ -25,6 +25,83 @@ const FELT = "#1f6b45";
 const FELT_DARK = "#175236";
 const CLOTH_ROUGHNESS = 0.95;
 
+const BRICK = { w: 0.16, h: 0.075, d: 0.075 };
+const BRICK_COLS = 8;
+const BRICK_ROWS = 5;
+const BRICK_GAP = 0.02;
+const BALL_R = 0.0286;
+
+/**
+ * The wall: rows of clay bricks standing on the cloth, facing the player.
+ * Row colour runs from deep terracotta at the back to warm sand at the front.
+ */
+const BRICK_COLORS = ["#8a3a2c", "#9d4632", "#b0533a", "#c06343", "#cd7452"];
+
+function BrickWall() {
+  const bricks = useMemo(() => {
+    const out: { x: number; z: number; color: string }[] = [];
+    const startX = -0.98;
+    const startZ = -((BRICK_COLS - 1) * (BRICK.w + BRICK_GAP)) / 2;
+    for (let row = 0; row < BRICK_ROWS; row++) {
+      for (let col = 0; col < BRICK_COLS; col++) {
+        out.push({
+          x: startX + row * (BRICK.d + BRICK_GAP),
+          z: startZ + col * (BRICK.w + BRICK_GAP),
+          color: BRICK_COLORS[row % BRICK_COLORS.length],
+        });
+      }
+    }
+    return out;
+  }, []);
+
+  return (
+    <group>
+      {bricks.map((b, i) => (
+        <RoundedBox
+          key={i}
+          args={[BRICK.d, BRICK.h, BRICK.w]}
+          radius={0.008}
+          smoothness={2}
+          position={[b.x, BED.y + BRICK.h / 2, b.z]}
+          castShadow
+          receiveShadow
+        >
+          <meshStandardMaterial color={b.color} roughness={0.78} metalness={0.02} />
+        </RoundedBox>
+      ))}
+    </group>
+  );
+}
+
+/** The handler: the bar the player moves, sitting near their end of the table. */
+function Handler() {
+  return (
+    <group position={[0.86, BED.y + 0.032, 0]}>
+      <RoundedBox args={[0.07, 0.055, 0.46]} radius={0.014} smoothness={2} castShadow receiveShadow>
+        <meshStandardMaterial color="#2a2118" roughness={0.45} metalness={0.25} />
+      </RoundedBox>
+      {/* A bright edge, so the thing you control is unmistakable against the cloth. */}
+      <mesh position={[0, 0.03, 0]}>
+        <boxGeometry args={[0.072, 0.008, 0.462]} />
+        <meshStandardMaterial
+          color="#7fd8ff"
+          emissive="#2aa6d6"
+          emissiveIntensity={1.4}
+          roughness={0.3}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function Ball() {
+  return (
+    <mesh position={[0.38, BED.y + BALL_R, 0]} castShadow receiveShadow>
+      <sphereGeometry args={[BALL_R, 48, 32]} />
+      <meshStandardMaterial color="#f7f4ea" roughness={0.16} metalness={0.02} />
+    </mesh>
+  );
+}
 function Table() {
   const { w, d, y } = BED;
   const outerW = w + RAIL * 2;
@@ -89,6 +166,10 @@ function Table() {
           <meshStandardMaterial color={FELT} roughness={CLOTH_ROUGHNESS} />
         </mesh>
       ))}
+
+      <BrickWall />
+      <Handler />
+      <Ball />
 
       {/* Apron and legs. */}
       <mesh position={[0, y - 0.11, 0]} castShadow receiveShadow>
