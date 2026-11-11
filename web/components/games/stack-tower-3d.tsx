@@ -2,17 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
 import type { Mesh } from "three";
 
-import { DT, JengaSim, type Placement } from "@/lib/jenga/sim";
+import { DT, JengaSim } from "@/lib/jenga/sim";
 import { LAYERS, PLANK, halfExtents, isTopLayer } from "@/lib/jenga/tower";
 import { choosePlacement, chooseVerifiedMove, rankMoves } from "@/lib/jenga/policy";
 
 const WOOD = "#d8a45e";
 const WOOD_DARK = "#a9762f";
 const HOVER = "#f2c98a";
+const HELD = "#7fd8ff";
+
+/** How far the carried plank may slide from the tower centre. */
+const CARRY_LIMIT = 1.15;
 
 type Side = "player" | "machine";
 type Phase = "pull" | "place" | "over";
@@ -24,15 +29,19 @@ interface MatchState {
 }
 
 const THINK_MS = 850;
-const PLACE_PAUSE_MS = 320;
 
 interface MatchRef {
   turn: Side;
   phase: Phase;
   loser: Side | null;
-  options: Placement[] | null;
-  /** Timestamp (ms) at which the machine is allowed to act. */
   actAt: number;
+}
+
+interface Held {
+  alongX: boolean;
+  x: number;
+  z: number;
+  y: number;
 }
 
 function legalPlanks(sim: JengaSim) {
@@ -43,33 +52,39 @@ function legalPlanks(sim: JengaSim) {
   });
 }
 
-function Scene({
-  sim,
-  onMatch,
-}: {
-  sim: JengaSim;
-  onMatch: (state: MatchState) => void;
-}) {
+function Scene({ sim, onMatch }: { sim: JengaSim; onMatch: (s: MatchState) => void }) {
+  const { camera, raycaster, gl } = useThree();
+
   const meshes = useRef(new Map<number, Mesh>());
   const acc = useRef(0);
   const wasPulling = useRef(false);
   const [hovered, setHovered] = useState<number | null>(null);
 
-  const match = useRef<MatchRef>({
-    turn: "player",
-    phase: "pull",
-    loser: null,
-    options: null,
-    actAt: 0,
-  });
+  const match = useRef<MatchRef>({ turn: "player", phase: "pull", loser: null, actAt: 0 });
+
+  const [held, setHeld] = useState<Held | null>(null);
+  const heldRef = useRef<Held | null>(null);
+  heldRef.current = held;
+
+  const carrying = useRef(false);
+  const pendingAlongX = useRef(true);
+  const dropPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), -3));
+  const dropHeld = useRef<(t?: { x: number; z: number; alongX: boolean }) => void>(() => {});
 
   const publish = useCallback(() => {
     onMatch({ turn: match.current.turn, phase: match.current.phase, loser: match.current.loser });
   }, [onMatch]);
 
+  const finish = (loser: Side) => {
+    match.current.phase = "over";
+    match.current.loser = loser;
+    setHeld(null);
+    publish();
+  };
+
   /**
-   * Option 3 of the collapse rule: let the tower settle completely before judging, so
-   * a slow collapse lands on the move that caused it instead of the next player's turn.
+   * Option 3 of the collapse rule: settle until the tower is genuinely still, then
+   * judge. A slow collapse is charged to the move that caused it.
    */
   const settleAndJudge = (side: Side): boolean => {
     sim.settle(2.5);
@@ -80,39 +95,118 @@ function Scene({
     return false;
   };
 
-  const finish = (loser: Side) => {
-    match.current.phase = "over";
-    match.current.loser = loser;
-    match.current.options = null;
+  const beginPlacement = () => {
+    const layer = sim.topLayer() + 1;
+    const topY = PLANK.h / 2 + layer * PLANK.h;
+    dropPlane.current.constant = -topY;
+    // Carry it at its landing height, so the drop is what you see.\n    setHeld({ alongX: pendingAlongX.current, x: 0, z: 0, y: topY });
+    match.current.phase = "place";
     publish();
   };
 
-  /** Runs one turn-boundary decision. Called every frame, cheap when nothing is due. */
+  dropHeld.current = (override) => {
+    const h = override ?? heldRef.current;
+    if (!h || match.current.phase !== "place") return;
+    sim.placeFree(h.x, h.z, h.alongX);
+    setHeld(null);
+    if (settleAndJudge("player")) return;
+    match.current.turn = "machine";
+    match.current.phase = "pull";
+    match.current.actAt = performance.now() + THINK_MS;
+    publish();
+  };
+
+  // Pointer: while carrying, the plank follows the cursor on the drop plane.
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      if (!carrying.current) return;
+      const rect = gl.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(ndc, camera);
+      const hit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(dropPlane.current, hit)) {
+        setHeld((prev) =>
+          prev
+            ? {
+                ...prev,
+                x: THREE.MathUtils.clamp(hit.x, -CARRY_LIMIT, CARRY_LIMIT),
+                z: THREE.MathUtils.clamp(hit.z, -CARRY_LIMIT, CARRY_LIMIT),
+              }
+            : prev,
+        );
+      }
+    };
+
+    const onUp = () => {
+      if (!carrying.current) return;
+      carrying.current = false;
+      dropHeld.current();
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [camera, gl, raycaster]);
+
+  // R rotates the carried plank.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "r") return;
+      setHeld((prev) => (prev ? { ...prev, alongX: !prev.alongX } : prev));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Test hook: the same drop path as a pointer release, callable without a mouse.
+  const debug = useRef({
+    state: () => ({ turn: "player" as Side, phase: "pull" as Phase, loser: null as Side | null }),
+    drop: (_x: number, _z: number, _alongX: boolean) => {},
+    rank: () => [] as unknown,
+    heldScreen: () => null as { x: number; y: number } | null,
+  });
+  debug.current.state = () => ({
+    turn: match.current.turn,
+    phase: match.current.phase,
+    loser: match.current.loser,
+  });
+  debug.current.drop = (x, z, alongX) => dropHeld.current({ x, z, alongX });
+  debug.current.rank = () => rankMoves(sim, 3);
+  debug.current.heldScreen = () => {
+    const h = heldRef.current;
+    if (!h) return null;
+    const v = new THREE.Vector3(h.x, h.y, h.z).project(camera);
+    const rect = gl.domElement.getBoundingClientRect();
+    return {
+      x: rect.left + ((v.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - v.y) / 2) * rect.height,
+    };
+  };
+  useEffect(() => {
+    (window as unknown as { __game?: typeof debug.current }).__game = debug.current;
+  }, []);
   const tickMatch = (now: number) => {
     const m = match.current;
     if (m.phase === "over") return;
-    // Never decide while a pull is animating: the decision costs eight physics probes,
-    // so running it per frame stalls the whole scene.
     if (sim.pulling) return;
 
-    if (m.phase === "place") {
-      // Player is choosing; nothing to do until they click.
-      return;
-    }
+    if (m.phase === "place") return;
 
-    if (m.turn === "machine" && m.phase === "pull" && now >= m.actAt) {
-      const legal = legalPlanks(sim);
-      if (legal.length === 0) {
-        finish("machine");
-        return;
-      }
-      // The opponent is the math model in lib/jenga/policy.ts: geometry and mass,
-      // no learning, no randomness.
+    if (m.turn === "machine" && now >= m.actAt) {
       const move = chooseVerifiedMove(sim);
       if (!move) {
         finish("machine");
         return;
       }
+      pendingAlongX.current = move.plankId % 2 === 0;
+      const plank = sim.planks.find((p) => p.id === move.plankId);
+      pendingAlongX.current = plank ? plank.alongX : true;
       sim.beginPull(move.plankId, 1);
     }
   };
@@ -137,25 +231,20 @@ function Scene({
 
     const m = match.current;
 
-    // A pull just ended: judge the tower, then either ask the player where to place,
-    // or let the machine place on its own.
     if (wasPulling.current && !sim.pulling) {
       wasPulling.current = false;
 
       if (settleAndJudge(m.turn)) return;
 
       if (m.turn === "player") {
-        m.options = sim.placementOptions();
-        m.phase = "place";
-        publish();
+        beginPlacement();
       } else {
         const opts = sim.placementOptions();
         if (opts.length === 0) {
           finish("machine");
           return;
         }
-        const chosen = choosePlacement(sim, opts);
-        sim.place(chosen);
+        sim.place(choosePlacement(sim, opts));
         if (settleAndJudge("machine")) return;
         m.turn = "player";
         m.phase = "pull";
@@ -176,54 +265,20 @@ function Scene({
     return left > 1 && !sim.pulling;
   };
 
-  const onPull = (id: number, layer: number) => (event: ThreeEvent<MouseEvent>) => {
+  const onPull = (id: number, layer: number, alongX: boolean) => (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
     if (!canPull(layer)) return;
+    pendingAlongX.current = alongX;
     sim.beginPull(id, 1);
   };
 
-  const placeOption = (opt: Placement) => {
-    const m = match.current;
-    if (m.phase !== "place") return;
-    sim.place(opt);
-    if (settleAndJudge("player")) return;
-    m.options = null;
-    m.turn = "machine";
-    m.phase = "pull";
-    m.actAt = performance.now() + THINK_MS;
-    publish();
-  };
-
-  const onPlace = (opt: Placement) => (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation();
-    placeOption(opt);
-  };
-
-  // Test hook: same code path as a click, without a pointer.
-  const debugApi = useRef({
-    place: (_index: number) => {},
-    state: () => ({ turn: "player" as Side, phase: "pull" as Phase, loser: null as Side | null }),
-    rank: () => [] as unknown,
-  });
-  debugApi.current.place = (index: number) => {
-    const opt = match.current.options?.[index];
-    if (opt) placeOption(opt);
-  };
-  debugApi.current.rank = () => rankMoves(sim, 5);
-  debugApi.current.state = () => ({
-    turn: match.current.turn,
-    phase: match.current.phase,
-    loser: match.current.loser,
-  });
-  useEffect(() => {
-    (window as unknown as { __game?: typeof debugApi.current }).__game = debugApi.current;
-  }, []);
+  const heldHe = held ? halfExtents(held.alongX) : null;
 
   return (
     <group>
       {sim.planks.map((p) => {
         const he = halfExtents(p.alongX);
-        const selectable = canPull(p.layer) && !sim.planks.find((q) => q.id === p.id)?.removed;
+        const selectable = canPull(p.layer);
         return (
           <mesh
             key={p.id}
@@ -235,7 +290,7 @@ function Scene({
             visible={!p.removed}
             castShadow
             receiveShadow
-            onClick={onPull(p.id, p.layer)}
+            onClick={onPull(p.id, p.layer, p.alongX)}
             onPointerOver={(e) => {
               e.stopPropagation();
               if (selectable) setHovered(p.id);
@@ -254,29 +309,35 @@ function Scene({
         );
       })}
 
-      {match.current.options && match.current.phase === "place"
-        ? match.current.options.map((o) => {
-            const he = halfExtents(o.alongX);
-            return (
-              <mesh
-                key={`${o.layer}-${o.alongX}-${o.slot}`}
-                position={[o.x, o.y + 0.05, o.z]}
-                onClick={onPlace(o)}
-                onPointerOver={(e) => e.stopPropagation()}
-              >
-                <boxGeometry args={[he.x * 2, he.y * 2, he.z * 2]} />
-                <meshStandardMaterial
-                  color="#7fd8ff"
-                  emissive="#2aa6d6"
-                  emissiveIntensity={0.7}
-                  transparent
-                  opacity={0.3}
-                  wireframe
-                />
-              </mesh>
-            );
-          })
-        : null}
+      {/* The plank in hand: press it to carry, release to drop. */}
+      {held && heldHe ? (
+        <mesh
+          position={[held.x, held.y, held.z]}
+          rotation={[0, held.alongX ? 0 : Math.PI / 2, 0]}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            carrying.current = true;
+          }}
+        >
+          <boxGeometry args={[PLANK.l, PLANK.h, PLANK.w]} />
+          <meshStandardMaterial
+            color={HELD}
+            emissive="#2aa6d6"
+            emissiveIntensity={0.5}
+            transparent
+            opacity={0.85}
+            roughness={0.4}
+          />
+        </mesh>
+      ) : null}
+
+      {/* Where it will land. */}
+      {held ? (
+        <mesh position={[held.x, PLANK.h / 2 + (sim.topLayer() + 1) * PLANK.h - 0.28, held.z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[PLANK.l, PLANK.w]} />
+          <meshBasicMaterial color={HELD} transparent opacity={0.18} side={THREE.DoubleSide} />
+        </mesh>
+      ) : null}
     </group>
   );
 }
@@ -341,6 +402,11 @@ export function StackTowerGame() {
             minDistance={9}
             maxDistance={30}
             maxPolarAngle={Math.PI / 2.05}
+            mouseButtons={{
+              LEFT: undefined as unknown as THREE.MOUSE,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.ROTATE,
+            }}
           />
         </Canvas>
       )}
@@ -367,11 +433,11 @@ export function StackTowerGame() {
           <p className="font-display text-[11px] uppercase tracking-[0.18em] text-zinc-200">
             {over
               ? match.loser === "player"
-                ? "the tower fell on your turn"
-                : "the tower fell on the machine's turn"
+                ? "the tower fell on your move"
+                : "the tower fell on the machine's move"
               : match.turn === "player"
                 ? match.phase === "place"
-                  ? "your turn · choose where it goes"
+                  ? "carry the plank onto the tower"
                   : "your turn · pull a plank"
                 : "machine is thinking"}
           </p>
@@ -380,7 +446,9 @@ export function StackTowerGame() {
               ? match.loser === "player"
                 ? "you lose"
                 : "you win"
-              : "drag to orbit · the top layer is locked"}
+              : match.phase === "place"
+                ? "press the plank · move · release to drop · R to rotate · right-drag to orbit"
+                : "click a plank to pull it · right-drag to orbit · the top layer is locked"}
           </p>
           {!sim && !error && (
             <p className="font-display mt-2 text-[10px] uppercase tracking-[0.16em] text-zinc-600">

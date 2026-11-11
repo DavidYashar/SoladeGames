@@ -126,6 +126,24 @@ export class JengaSim {
   }
 
 
+  /**
+   * Free placement: the player carries the plank and releases it anywhere over the
+   * tower, in whichever orientation they rotated to.
+   */
+  placeFree(x: number, z: number, alongX: boolean): Placement {
+    const top = this.topLayer();
+    const inTop = this.planks.filter((p) => p.layer === top && !p.removed);
+    const sameOrientation = inTop.length > 0 && inTop.every((p) => p.alongX === alongX);
+    const layer = inTop.length > 0 && inTop.length < 3 && sameOrientation ? top : top + 1;
+    const y = PLANK.h / 2 + layer * PLANK.h;
+
+    const perpendicular = alongX ? z : x;
+    const slot = perpendicular < -0.5 ? 0 : perpendicular > 0.5 ? 2 : 1;
+
+    const placement: Placement = { layer, alongX, slot, x, y, z };
+    this.place(placement);
+    return placement;
+  }
   /** Highest layer that still has a plank in it. */
   topLayer(): number {
     let top = 0;
@@ -363,14 +381,21 @@ export class JengaSim {
 
     return { fallen, maxDisp: Number(maxDisp.toFixed(3)), poses };
   }
-  /** Planks that have left the tower and dropped below the table. */
+  /**
+   * Planks that have left the tower.
+   *
+   * The old check was "below the table", which missed the common case: a plank that
+   * slides off the top and lands ON the table, at y around 0.3. A plank now counts as
+   * fallen when it sits more than one layer below where its layer belongs.
+   */
   fallen(): number[] {
     const out: number[] = [];
     for (const p of this.planks) {
       if (p.removed) continue;
       const body = this.body(p.id);
       if (!body) continue;
-      if (body.translation().y < -0.9) out.push(p.id);
+      const nominal = PLANK.h / 2 + p.layer * PLANK.h;
+      if (body.translation().y < nominal - 0.75) out.push(p.id);
     }
     return out;
   }
