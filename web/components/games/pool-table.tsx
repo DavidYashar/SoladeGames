@@ -276,11 +276,11 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0.42, BED.y + 0.003, 0.3]}
       >
-        <planeGeometry args={[BALL_R * 4.6, BALL_R * 4.6]} />
+        <planeGeometry args={[BALL_R * 2.5, BALL_R * 2.5]} />
         <meshBasicMaterial
           map={shadowTex}
           transparent
-          opacity={0.9}
+          opacity={0.7}
           depthWrite={false}
           toneMapped={false}
         />
