@@ -40,6 +40,14 @@ interface PullState {
   alongX: boolean;
 }
 
+export interface Placement {
+  layer: number;
+  alongX: boolean;
+  slot: number;
+  x: number;
+  y: number;
+  z: number;
+}
 export class JengaSim {
   world: RAPIER.World;
   planks: PlankState[];
@@ -48,6 +56,7 @@ export class JengaSim {
   private bodies = new Map<number, RAPIER.RigidBody>();
   private start = new Map<number, { x: number; y: number; z: number }>();
   private pull: PullState | null = null;
+  private nextId = 1000;
 
   private constructor(world: RAPIER.World, planks: PlankState[]) {
     this.world = world;
@@ -116,6 +125,87 @@ export class JengaSim {
     return this.bodies.get(id);
   }
 
+
+  /** Highest layer that still has a plank in it. */
+  topLayer(): number {
+    let top = 0;
+    for (const p of this.planks) {
+      if (!p.removed && p.layer > top) top = p.layer;
+    }
+    return top;
+  }
+
+  /**
+   * Where the extracted plank may go. A half-filled top layer offers its free slots in
+   * that layer's orientation; a full top layer opens a new one, where both orientations
+   * and all three positions are available.
+   */
+  placementOptions(): Placement[] {
+    const top = this.topLayer();
+    const inTop = this.planks.filter((p) => p.layer === top && !p.removed);
+    const out: Placement[] = [];
+
+    const push = (layer: number, alongX: boolean, slot: number) => {
+      const offset = (slot - 1) * (PLANK.w + GAP);
+      out.push({
+        layer,
+        alongX,
+        slot,
+        x: alongX ? 0 : offset,
+        y: PLANK.h / 2 + layer * PLANK.h,
+        z: alongX ? offset : 0,
+      });
+    };
+
+    if (inTop.length > 0 && inTop.length < 3) {
+      const alongX = inTop[0].alongX;
+      const taken = new Set(inTop.map((p) => p.slot));
+      for (let slot = 0; slot < 3; slot++) {
+        if (!taken.has(slot)) push(top, alongX, slot);
+      }
+      return out;
+    }
+
+    const layer = inTop.length === 0 ? top : top + 1;
+    for (const alongX of [true, false]) {
+      for (let slot = 0; slot < 3; slot++) push(layer, alongX, slot);
+    }
+    return out;
+  }
+
+  /** Drops a plank into one of the offered placements. */
+  place(opt: Placement): boolean {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(opt.x, opt.y, opt.z)
+        .setLinearDamping(0.08)
+        .setAngularDamping(0.35)
+        .setCcdEnabled(true),
+    );
+    const he = halfExtents(opt.alongX);
+    this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
+        .setFriction(0.72)
+        .setRestitution(0.02)
+        .setDensity(0.8),
+      body,
+    );
+
+    const id = this.nextId++;
+    this.bodies.set(id, body);
+    this.start.set(id, { x: opt.x, y: opt.y, z: opt.z });
+    this.planks.push({
+      id,
+      layer: opt.layer,
+      slot: opt.slot,
+      alongX: opt.alongX,
+      x: opt.x,
+      y: opt.y,
+      z: opt.z,
+      removed: false,
+    });
+    return true;
+  }
   /** One fixed physics step, including any extraction in progress. */
   step(): void {
     if (this.pull) {
