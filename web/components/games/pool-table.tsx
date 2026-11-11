@@ -93,6 +93,29 @@ const BALL_R = 0.042;
 const FELT_TOP = BED.y + 0.02;
 
 const HANDLER_X = 0.86;
+const HANDLER_Y = FELT_TOP + 0.032;
+const HANDLER_HALF = 0.23;
+const BALL_SPEED = 5.4;
+
+/**
+ * Bounce and grip per material. Glass rings and keeps the ball fast, clay deadens it,
+ * iron kicks it back almost as hard as it arrived.
+ */
+const BRICK_BOUNCE: Record<BrickKind, { restitution: number; friction: number }> = {
+  clay: { restitution: 0.3, friction: 0.7 },
+  stone: { restitution: 0.45, friction: 0.75 },
+  glass: { restitution: 0.96, friction: 0.12 },
+  keg: { restitution: 0.4, friction: 0.5 },
+  gold: { restitution: 0.62, friction: 0.28 },
+  iron: { restitution: 0.94, friction: 0.18 },
+};
+
+/** State shared between the physics world and the movable handler. */
+const shared = {
+  handlerZ: 0,
+  handlerBody: null as RAPIER.RigidBody | null,
+  ballBody: null as RAPIER.RigidBody | null,
+};
 
 interface BrickSpec {
   x: number;
@@ -254,13 +277,83 @@ function EnvSetup() {
 
 /** The handler: the bar the player moves, sitting near their end of the table. */
 function Handler() {
+  const { camera, gl } = useThree();
+  const group = useRef<THREE.Group>(null);
+
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -FELT_TOP), []);
+  const pointer = useMemo(() => new THREE.Vector2(), []);
+  const hit = useMemo(() => new THREE.Vector3(), []);
+
+  const aim = (event: PointerEvent): boolean => {
+    const rect = gl.domElement.getBoundingClientRect();
+    pointer.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointer, camera);
+    return raycaster.ray.intersectPlane(plane, hit) !== null;
+  };
+
+  useEffect(() => {
+    const element = gl.domElement;
+
+    const onMove = (event: PointerEvent) => {
+      if (!aim(event)) return;
+      const limit = BED.d / 2 - HANDLER_HALF - 0.02;
+      shared.handlerZ = THREE.MathUtils.clamp(hit.z, -limit, limit);
+    };
+
+    const onDown = (event: PointerEvent) => {
+      if (!aim(event)) return;
+      const ball = shared.ballBody;
+      if (!ball) return;
+
+      const spawnX = HANDLER_X - 0.14;
+      const spawnZ = shared.handlerZ;
+      ball.setTranslation({ x: spawnX, y: FELT_TOP + BALL_R, z: spawnZ }, true);
+      ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
+
+      // Aim by where the pointer sits across the table: left sends the ball left.
+      // Aiming along (hit - spawn) collapses when the click lands near the ball.
+      const lean = THREE.MathUtils.clamp((hit.z / (BED.d / 2)) * 1.05, -0.92, 0.92);
+      const scale = 1 / Math.hypot(1, lean);
+      ball.setLinvel(
+        { x: -scale * BALL_SPEED, y: 0, z: lean * scale * BALL_SPEED },
+        true,
+      );
+      (
+        window as unknown as { __lastServe?: unknown }
+      ).__lastServe = { hitZ: hit.z, handlerZ: shared.handlerZ, lean, scale };
+    };
+
+    (window as unknown as { __handlerZ?: () => number }).__handlerZ = () => shared.handlerZ;
+
+    element.addEventListener("pointermove", onMove);
+    element.addEventListener("pointerdown", onDown);
+    return () => {
+      element.removeEventListener("pointermove", onMove);
+      element.removeEventListener("pointerdown", onDown);
+    };
+  }, [camera, gl, raycaster, plane, pointer, hit]);
+
+  useFrame(() => {
+    if (group.current) group.current.position.z = shared.handlerZ;
+  });
+
   return (
-    <group position={[HANDLER_X, BED.y + 0.032, 0]}>
-      <RoundedBox args={[0.07, 0.055, 0.46]} radius={0.014} smoothness={2} castShadow receiveShadow>
+    <group ref={group} position={[HANDLER_X, HANDLER_Y, 0]}>
+      <RoundedBox
+        args={[0.07, 0.055, HANDLER_HALF * 2]}
+        radius={0.014}
+        smoothness={2}
+        castShadow
+        receiveShadow
+      >
         <meshStandardMaterial color="#2a2118" roughness={0.45} metalness={0.25} />
       </RoundedBox>
       <mesh position={[0, 0.03, 0]}>
-        <boxGeometry args={[0.072, 0.008, 0.462]} />
+        <boxGeometry args={[0.072, 0.008, HANDLER_HALF * 2 + 0.002]} />
         <meshStandardMaterial
           color="#7fd8ff"
           emissive="#2aa6d6"
@@ -323,29 +416,39 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       wall(0.02, 0.05, BED.d / 2, BED.w / 2 + 0.02, BED.y + 0.05, 0);
       wall(0.02, 0.05, BED.d / 2, -(BED.w / 2 + 0.02), BED.y + 0.05, 0);
 
-      // Bricks, fixed for now: they will become destructible.
+      // Bricks: solid for now, each with the bounce its material implies.
       for (const b of bricks) {
+        const bounce = BRICK_BOUNCE[b.kind];
         w.createCollider(
           RAPIER.ColliderDesc.cuboid(BRICK.d / 2, BRICK.h / 2, BRICK.w / 2)
             .setTranslation(b.x, BED.y + BRICK.h / 2, b.z)
-            .setFriction(0.5)
-            .setRestitution(0.45),
+            .setFriction(bounce.friction)
+            .setRestitution(bounce.restitution),
         );
       }
 
-      // The handler, so the ball comes back off it.
-      w.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.035, 0.055, 0.23)
-          .setTranslation(HANDLER_X, BED.y + 0.032, 0)
-          .setFriction(0.3)
-          .setRestitution(0.85),
+      // The handler is kinematic: it moves where the pointer puts it and shoves the
+      // ball back with its own surface properties.
+      const handlerBody = w.createRigidBody(
+        RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
+          HANDLER_X,
+          HANDLER_Y,
+          shared.handlerZ,
+        ),
       );
+      w.createCollider(
+        RAPIER.ColliderDesc.cuboid(0.035, 0.055, HANDLER_HALF)
+          .setFriction(0.25)
+          .setRestitution(0.9),
+        handlerBody,
+      );
+      shared.handlerBody = handlerBody;
 
       const b = w.createRigidBody(
         RAPIER.RigidBodyDesc.dynamic()
           .setTranslation(0.42, FELT_TOP + BALL_R, 0.3)
-          .setLinearDamping(0.22)
-          .setAngularDamping(0.35)
+          .setLinearDamping(0.06)
+          .setAngularDamping(0.15)
           .setCcdEnabled(true),
       );
       w.createCollider(
@@ -357,7 +460,7 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       );
 
       // Launch it up the table toward the wall, with a slight angle.
-      b.setLinvel({ x: -3.1, y: 0, z: -0.55 }, true);
+      b.setLinvel({ x: -BALL_SPEED, y: 0, z: -0.45 }, true);
       b.setAngvel({ x: 0, y: 0, z: 0 }, true);
 
       if (cancelled) {
@@ -366,6 +469,7 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
       }
       world.current = w;
       body.current = b;
+      shared.ballBody = b;
       (window as unknown as { __ballState?: () => unknown }).__ballState = () => {
         const t = b.translation();
         const v = b.linvel();
@@ -389,6 +493,12 @@ function Ball({ bricks }: { bricks: BrickSpec[] }) {
     const w = world.current;
     const b = body.current;
     if (!w || !b) return;
+
+    shared.handlerBody?.setNextKinematicTranslation({
+      x: HANDLER_X,
+      y: HANDLER_Y,
+      z: shared.handlerZ,
+    });
 
     acc.current += Math.min(delta, 0.1);
     let steps = 0;
@@ -634,7 +744,7 @@ export function PoolTable() {
           </p>
         </div>
         <p className="mx-auto rounded-sm bg-black/55 px-3 py-1 text-center font-display text-[9px] uppercase tracking-[0.16em] text-zinc-400">
-          six brick types · ball is live · bricks are static
+          move the mouse to slide the handler · click to serve
         </p>
       </div>
     </div>
