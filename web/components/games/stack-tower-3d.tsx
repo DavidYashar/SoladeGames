@@ -67,6 +67,19 @@ function Scene({
     onMatch({ turn: match.current.turn, phase: match.current.phase, loser: match.current.loser });
   }, [onMatch]);
 
+  /**
+   * Option 3 of the collapse rule: let the tower settle completely before judging, so
+   * a slow collapse lands on the move that caused it instead of the next player's turn.
+   */
+  const settleAndJudge = (side: Side): boolean => {
+    sim.settle(2.5);
+    if (sim.fallen().length > 0) {
+      finish(side);
+      return true;
+    }
+    return false;
+  };
+
   const finish = (loser: Side) => {
     match.current.phase = "over";
     match.current.loser = loser;
@@ -129,10 +142,7 @@ function Scene({
     if (wasPulling.current && !sim.pulling) {
       wasPulling.current = false;
 
-      if (sim.fallen().length > 0) {
-        finish(m.turn);
-        return;
-      }
+      if (settleAndJudge(m.turn)) return;
 
       if (m.turn === "player") {
         m.options = sim.placementOptions();
@@ -146,11 +156,7 @@ function Scene({
         }
         const chosen = choosePlacement(sim, opts);
         sim.place(chosen);
-        sim.settle(0.8);
-        if (sim.fallen().length > 0) {
-          finish("machine");
-          return;
-        }
+        if (settleAndJudge("machine")) return;
         m.turn = "player";
         m.phase = "pull";
         publish();
@@ -180,11 +186,7 @@ function Scene({
     const m = match.current;
     if (m.phase !== "place") return;
     sim.place(opt);
-    sim.settle(0.8);
-    if (sim.fallen().length > 0) {
-      finish("player");
-      return;
-    }
+    if (settleAndJudge("player")) return;
     m.options = null;
     m.turn = "machine";
     m.phase = "pull";

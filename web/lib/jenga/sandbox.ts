@@ -89,7 +89,7 @@ export async function runPolicySandbox(trials = 4, turns = 40, randomize = false
         if (!move) break;
         sim.beginPull(move.plankId, 1);
       }
-      sim.settle(0.9);
+      sim.settle(2.2);
       if (sim.fallen().length > baseline) {
         collapsedAt = t + 1;
         break;
@@ -97,7 +97,7 @@ export async function runPolicySandbox(trials = 4, turns = 40, randomize = false
       const options = sim.placementOptions();
       if (options.length === 0) break;
       sim.place(useRandom ? options[Math.floor(Math.random() * options.length)] : choosePlacement(sim, options));
-      sim.settle(0.7);
+      sim.settle(2.2);
       if (sim.fallen().length > baseline) {
         collapsedAt = t + 1;
         break;
