@@ -539,6 +539,59 @@ function FlipperMesh({ side }: { side: 1 | -1 }) {
   );
 }
 
+const LANE_ARROWS = [0.3, 0.19, 0.08];
+
+/** Three chevrons on the shooter lane floor, blinking red and blue up the chute. */
+function LaneArrows() {
+  const mats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(0.024, 0);
+    shape.lineTo(-0.012, 0.017);
+    shape.lineTo(-0.012, -0.017);
+    shape.closePath();
+    return new THREE.ShapeGeometry(shape);
+  }, []);
+
+  useFrame(() => {
+    const now = performance.now() / 1000;
+    mats.current.forEach((mat, i) => {
+      if (!mat) return;
+      // Each arrow is a step further along the blink, so the lane reads as a direction.
+      const step = (now * 2.2 + i * 0.45) % 2;
+      const red = step < 1;
+      mat.color.set(red ? "#ff2f2f" : "#3a7bff");
+      mat.opacity = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(now * 7 + i * 0.9));
+    });
+  });
+
+  return (
+    <group>
+      {LANE_ARROWS.map((x, i) => (
+        <mesh
+          key={x}
+          geometry={geometry}
+          // The slate top is at PLAY.y + 0.008; anything lower is buried inside it.
+          position={[x, PLAY.y + 0.0088, CORRIDOR_Z]}
+          rotation={[-Math.PI / 2, 0, Math.PI]}
+        >
+          <meshBasicMaterial
+            ref={(m) => {
+              mats.current[i] = m;
+            }}
+            transparent
+            opacity={0.8}
+            toneMapped={false}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /** The plunger: a spring and shooter rod at the bottom of the lane. */
 function PlungerSpring() {
   const spring = useRef<THREE.Group>(null);
@@ -1407,6 +1460,7 @@ function Cabinet() {
       <RolloverRing z={M(0)} />
 
       <PlungerSpring />
+      <LaneArrows />
       <Slingshot side={1} />
       <Slingshot side={-1} />
       <Post x={0.3} z={M(0.2)} />
