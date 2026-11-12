@@ -870,7 +870,7 @@ function Pinball({
           ),
         );
         w.createCollider(
-          RAPIER.ColliderDesc.cuboid(FLIPPER.len / 2, 0.012, FLIPPER.width / 2)
+          RAPIER.ColliderDesc.cuboid(FLIPPER.len / 2, 0.0138, FLIPPER.width / 2)
             .setTranslation(FLIPPER.len / 2, 0, 0)
             .setFriction(0.06)
             .setRestitution(0.66),
@@ -1355,10 +1355,10 @@ function Pinball({
         <primitive object={ballModel} />
       </group>
 
-      <group ref={leftFlip} position={[0.34, PLAY.y + 0.02, M(0.112)]}>
+      <group ref={leftFlip} position={[0.34, PLAY.y + 0.02, M(0.112)]} scale={[1, 1.15, 1]}>
         <FlipperMesh side={1} />
       </group>
-      <group ref={rightFlip} position={[0.34, PLAY.y + 0.02, M(-0.112)]}>
+      <group ref={rightFlip} position={[0.34, PLAY.y + 0.02, M(-0.112)]} scale={[1, 1.15, 1]}>
         <FlipperMesh side={-1} />
       </group>
     </>
