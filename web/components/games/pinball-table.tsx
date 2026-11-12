@@ -372,7 +372,7 @@ function Slingshot({ side }: { side: 1 | -1 }) {
     <GltfPart
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
-      position={[0.06, PLAY.y + 0.011, side > 0 ? 0.243 : -0.188]}
+      position={[side > 0 ? -0.075 : 0.04, PLAY.y + 0.011, side > 0 ? 0.256 : -0.201]}
       rotation={[0, side > 0 ? 0 : Math.PI, 0]}
     />
   );
@@ -666,7 +666,7 @@ function Pinball({
       for (const side of [1, -1] as const) {
         const c = w.createCollider(
           RAPIER.ColliderDesc.cuboid(0.058, 0.03, 0.03)
-            .setTranslation(0.075, PLAY.y + 0.03, side > 0 ? 0.212 : -0.157)
+            .setTranslation(-0.017, PLAY.y + 0.03, side > 0 ? 0.222 : -0.167)
             .setFriction(0.04)
             .setRestitution(1.15),
         );
