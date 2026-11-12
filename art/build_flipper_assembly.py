@@ -160,8 +160,8 @@ def build_arm() -> None:
     clear()
 
     # 120 degree bend: long vertical run, then a short diagonal into the pivot.
-    bend = (0.108, 0.062)
-    top = (0.30, 0.062)
+    bend = (0.108, 0.12)
+    top = (0.30, 0.12)
 
     arm = bar("Arm", 0.0, 0.0, bend[0], bend[1], 0.023, 0.016)
     run = bar("ArmRun", top[0], top[1], bend[0], bend[1], 0.023, 0.016)
