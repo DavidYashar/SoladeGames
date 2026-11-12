@@ -1168,9 +1168,9 @@ function Pinball({
       });
 
       for (const side of [1, -1] as const) {
-        const [px, plateZ] = SLING_POS[side];
-        const dx = t.x - px;
-        const dz = t.z - plateZ;
+        const plate = slingPlacement(side);
+        const dx = t.x - plate.x;
+        const dz = t.z - plate.z;
         if (Math.hypot(dx, dz) > 0.062) continue;
         if (now < (slingCooldown.current[side] ?? 0)) continue;
         slingCooldown.current[side] = now + 260;
@@ -1184,7 +1184,10 @@ function Pinball({
         shared.score += 25;
         shared.onScore?.(shared.score);
 
-        ball.setTranslation({ x: t.x, y: PLAY.y + 0.025, z: plateZ + inward * 0.06 }, true);
+        ball.setTranslation(
+          { x: t.x, y: PLAY.y + 0.025, z: plate.z + inward * 0.06 },
+          true,
+        );
         ball.setLinvel({ x: vx, y: 0.15, z: vz }, true);
       }
     }
