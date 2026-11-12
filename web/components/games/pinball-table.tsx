@@ -372,8 +372,8 @@ function Slingshot({ side }: { side: 1 | -1 }) {
     <GltfPart
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
-      position={[0.085, PLAY.y + 0.011, M(side * 0.205)]}
-      rotation={[0, side > 0 ? -0.32 : Math.PI + 0.32, 0]}
+      position={[0.06, PLAY.y + 0.011, side > 0 ? 0.243 : -0.188]}
+      rotation={[0, side > 0 ? 0 : Math.PI, 0]}
     />
   );
 }
@@ -665,9 +665,8 @@ function Pinball({
       // Slingshot faces: a kicker just inside each funnel.
       for (const side of [1, -1] as const) {
         const c = w.createCollider(
-          RAPIER.ColliderDesc.cuboid(0.055, 0.03, 0.012)
-            .setTranslation(0.22, PLAY.y + 0.03, M(side * 0.152))
-            .setRotation(quatFromY(side > 0 ? -0.32 : Math.PI + 0.32))
+          RAPIER.ColliderDesc.cuboid(0.058, 0.03, 0.03)
+            .setTranslation(0.075, PLAY.y + 0.03, side > 0 ? 0.212 : -0.157)
             .setFriction(0.04)
             .setRestitution(1.15),
         );
