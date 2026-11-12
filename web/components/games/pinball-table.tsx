@@ -1359,23 +1359,99 @@ function Cabinet() {
 
       <TableWalls />
 
-      {/* Apron and legs */}
-      <mesh position={[0.62, PLAY.y - 0.07, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.16, 0.1, outerW + 0.02]} />
-        <meshStandardMaterial color="#1a120c" roughness={0.7} />
-      </mesh>
+      {/* Cabinet body: the box the playfield drops into. */}
+      <RoundedBox
+        args={[outerL + 0.05, 0.24, outerW + 0.05]}
+        radius={0.01}
+        smoothness={3}
+        position={[0, PLAY.y - 0.145, 0]}
+        castShadow
+        receiveShadow
+      >
+        <primitive object={wood} attach="material" />
+      </RoundedBox>
 
+      {/* Apron across the player's end. */}
+      <RoundedBox
+        args={[0.085, 0.13, outerW * 0.9]}
+        radius={0.008}
+        smoothness={2}
+        position={[outerL / 2 + 0.055, PLAY.y + 0.015, 0]}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial color="#241a13" roughness={0.6} metalness={0.1} />
+      </RoundedBox>
+
+      {/* Legs with feet. */}
       {[
-        [-outerL / 2 + 0.09, -outerW / 2 + 0.09],
-        [-outerL / 2 + 0.09, outerW / 2 - 0.09],
-        [outerL / 2 - 0.09, -outerW / 2 + 0.09],
-        [outerL / 2 - 0.09, outerW / 2 - 0.09],
-      ].map(([lx, lz], i) => (
-        <mesh key={`leg${i}`} position={[lx, (PLAY.y - 0.16) / 2, lz]} castShadow receiveShadow>
-          <boxGeometry args={[0.07, PLAY.y - 0.16, 0.07]} />
+        [outerL / 2 - 0.07, outerW / 2 - 0.07],
+        [outerL / 2 - 0.07, -(outerW / 2 - 0.07)],
+        [-(outerL / 2 - 0.07), outerW / 2 - 0.07],
+        [-(outerL / 2 - 0.07), -(outerW / 2 - 0.07)],
+      ].map(([lx, lz], i) => {
+        const top = PLAY.y - 0.26;
+        const legLength = top;
+        return (
+          <group key={`leg${i}`} position={[lx, 0, lz]}>
+            <RoundedBox
+              args={[0.052, legLength, 0.052]}
+              radius={0.006}
+              smoothness={2}
+              position={[0, legLength / 2, 0]}
+              castShadow
+              receiveShadow
+            >
+              <primitive object={wood} attach="material" />
+            </RoundedBox>
+            <RoundedBox
+              args={[0.085, 0.018, 0.085]}
+              radius={0.004}
+              smoothness={2}
+              position={[0, 0.009, 0]}
+              castShadow
+              receiveShadow
+            >
+              <meshStandardMaterial color="#1b1b1e" roughness={0.4} metalness={0.7} />
+            </RoundedBox>
+            {/* Leveller collar, as on a real cabinet leg. */}
+            <mesh position={[0, legLength * 0.72, 0]} castShadow>
+              <cylinderGeometry args={[0.034, 0.034, 0.05, 16]} />
+              <meshStandardMaterial color="#2a2a2e" roughness={0.35} metalness={0.8} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {/* Backbox at the far end, lid open. */}
+      <group position={[-(outerL / 2 + 0.1), PLAY.y + 0.2, 0]} rotation={[0, 0, 0.1]}>
+        <RoundedBox
+          args={[0.13, 0.34, outerW * 0.86]}
+          radius={0.01}
+          smoothness={3}
+          castShadow
+          receiveShadow
+        >
           <primitive object={wood} attach="material" />
+        </RoundedBox>
+        {/* Dark display face. */}
+        <mesh position={[0.068, 0.01, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <planeGeometry args={[outerW * 0.72, 0.2]} />
+          <meshStandardMaterial color="#07080a" roughness={0.35} metalness={0.2} />
         </mesh>
-      ))}
+        {/* Lid, hinged at the top and standing open. */}
+        <group position={[-0.015, 0.175, 0]} rotation={[0, 0, 0.55]}>
+          <RoundedBox
+            args={[0.02, 0.3, outerW * 0.86]}
+            radius={0.008}
+            smoothness={2}
+            position={[0, 0.15, 0]}
+            castShadow
+          >
+            <primitive object={wood} attach="material" />
+          </RoundedBox>
+        </group>
+      </group>
     </group>
   );
 }
@@ -1410,7 +1486,7 @@ export function PinballTable() {
       <Canvas
         shadows="percentage"
         dpr={[1, 2]}
-        camera={{ position: [1.18, 2.26, 0], fov: 40, near: 0.02, far: 40 }}
+        camera={{ position: [1.42, 2.72, 0], fov: 40, near: 0.02, far: 40 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
         onCreated={({ camera }) => camera.lookAt(0, PLAY.y + 0.02, 0)}
       >
