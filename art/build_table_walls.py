@@ -117,6 +117,20 @@ def join(parts, name):
     return obj
 
 
+def corner_post(prefix: str, world_point, i: int, width: float, height: float, z0: float):
+    """A square block filling the corner where two walls meet."""
+    x, z = world_point
+    bpy.ops.mesh.primitive_cube_add(
+        size=1, location=(x, -z, z0 + height / 2)
+    )
+    obj = bpy.context.active_object
+    obj.name = f"{prefix}{i}"
+    obj.scale = (width, width, height)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(scale=True)
+    return obj
+
+
 def build_wall(prefix: str, world_points):
     """Dark body, cream plinth under it, and a bevelled cap."""
     bodies, plinths, caps = [], [], []
@@ -173,6 +187,20 @@ def main() -> None:
     for name, points in walls.items():
         prefix = name[0].upper() + name[1:]
         parts += build_wall(prefix, points)
+
+    # Corner posts, one per junction.
+    junctions = [NEAR_LEFT, NEAR_RIGHT, HEAD_START, LANE_RAIL_END, FAR]
+    post_plinth = [corner_post("PostP", pt, i, PLINTH_W, PLINTH_H, 0.0) for i, pt in enumerate(junctions)]
+    post_body = [corner_post("PostB", pt, i, WALL_W, WALL_H, 0.0) for i, pt in enumerate(junctions)]
+    post_cap = [
+        corner_post("PostC", pt, i, CAP_W, CAP_H, WALL_H - CAP_H * 0.6)
+        for i, pt in enumerate(junctions)
+    ]
+    for group, name in ((post_plinth, "JointsPlinth"), (post_body, "JointsBody"), (post_cap, "JointsCap")):
+        joined = join(group, name)
+        bevel(joined, 0.002, 4)
+        smooth(joined)
+        parts.append(joined)
 
     bpy.ops.object.select_all(action="DESELECT")
     for obj in parts:
