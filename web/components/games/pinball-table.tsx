@@ -377,9 +377,11 @@ const SLING_MAP = {
 };
 
 /** Where each plate sits: the inside corner of the L formed by its arm. */
+// Midpoint of the arm's diagonal, which runs from the elbow (0.232, +/-0.2595) to
+// the flipper pivot (0.34, +/-0.1395). The plate nests there.
 const SLING_POS: Record<1 | -1, [number, number]> = {
-  1: [0.2, 0.232],
-  [-1]: [0.2, -0.177],
+  1: [0.286, 0.1995],
+  [-1]: [0.286, -0.1445],
 };
 
 /** The red triangle from the icon set: a kicker beside each flipper. */
@@ -390,8 +392,8 @@ function Slingshot({ side }: { side: 1 | -1 }) {
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
       position={[x, PLAY.y + 0.008, z]}
-      // Wide edge faces the middle of the field, apex into the corner of the arm.
-      rotation={[0, side > 0 ? 0 : Math.PI, 0]}
+      // Point at the elbow, long axis following the diagonal of the arm.
+      rotation={[0, side > 0 ? 2.4 : 0.73, 0]}
     />
   );
 }
