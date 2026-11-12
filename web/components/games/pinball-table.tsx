@@ -369,10 +369,11 @@ function LaneWall({ side }: { side: 1 | -1 }) {
   );
 }
 
+// Names come from the traced PNG layers.
 const SLING_MAP = {
+  Casing: PART_CREAM,
+  Frame: PART_DARK,
   Face: PART_AMBER,
-  Stripe: PART_DARK,
-  Rim: PART_CREAM,
   Screw: PART_STEEL,
 };
 
