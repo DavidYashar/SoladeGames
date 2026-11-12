@@ -29,7 +29,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 DATA.parent.mkdir(parents=True, exist_ok=True)
 
 HALF_W = 0.27
-HALF_L = 0.54
+HALF_L = 0.04
 LANE_W = 0.055
 DIVIDER_Z = -HALF_W + 0.012 + LANE_W - 0.008
 CENTER_Z = (HALF_W - 0.012 + DIVIDER_Z + 0.008) / 2
@@ -91,6 +91,11 @@ def segment(name: str, p0, p1, width: float, height: float, z0: float):
 
 
 def join(parts, name):
+    # A single-segment wall has nothing to join; calling the operator anyway prints
+    # "No mesh data to join" once per part.
+    if len(parts) == 1:
+        parts[0].name = name
+        return parts[0]
     bpy.ops.object.select_all(action="DESELECT")
     for p in parts:
         p.select_set(True)
