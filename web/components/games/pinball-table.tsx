@@ -391,7 +391,7 @@ function Slingshot({ side }: { side: 1 | -1 }) {
       mapping={SLING_MAP}
       position={[x, PLAY.y + 0.008, z]}
       // Wide edge faces the middle of the field, apex into the corner of the arm.
-      rotation={[0, side > 0 ? Math.PI : 0, 0]}
+      rotation={[0, side > 0 ? 0 : Math.PI, 0]}
     />
   );
 }
