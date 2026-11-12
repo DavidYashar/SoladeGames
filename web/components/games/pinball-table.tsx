@@ -26,8 +26,11 @@ const HALF_L = PLAY.l / 2;
 
 // Lane width is two thirds of what it was: 55 mm, about two ball widths.
 const LANE_W = 0.055;
-const CORRIDOR_Z = -HALF_W + 0.012 + LANE_W / 2;
 const DIVIDER_Z = -HALF_W + 0.012 + LANE_W - 0.008;
+
+// Centre of the real lane: between the outer wall's inner face and the divider's
+// lane-side face. LANE_W is not the clear width, because the divider is a slab.
+const CORRIDOR_Z = (-HALF_W + 0.012 + (DIVIDER_Z - 0.008)) / 2;
 
 /**
  * The playfield is not centred on the cabinet: the lane eats the right-hand strip, so
@@ -438,6 +441,7 @@ function Pinball({
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
   const mode = useRef<"idle" | "play">("idle");
+  const exitCooldown = useRef(0);
   const flip = useRef({
     left: FLIP_REST,
     right: -FLIP_REST,
@@ -531,11 +535,11 @@ function Pinball({
       // what keeps the ball alive.
       for (const side of [1, -1] as const) {
         const pts: [number, number][] = [
-          // Upper tip stands clear of the side wall, so a ball that gets in there
-          // can pass through rather than being trapped.
-          [0.08, M(side * 0.2)],
+          // Upper end meets the side wall, so nothing can perch on the tip or slip
+          // behind it.
+          [0.04, side > 0 ? HALF_W - 0.012 : DIVIDER_Z + 0.008],
           [0.2, M(side * 0.16)],
-          // Lower end lands on the flipper hinge: no gap for the ball to slip into.
+          // Lower end lands on the flipper hinge.
           [0.34, M(side * 0.112)],
         ];
         for (let i = 0; i < pts.length - 1; i += 1) {
@@ -893,6 +897,25 @@ function Pinball({
       ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
     }
 
+    // Lane exit. The shooter lane ends in a gate on a real table; here the ball is
+    // turned into the field the moment it reaches the top of the lane, once per
+    // approach, so it can never come back down the chute.
+    if (mode.current === "play") {
+      const here = ball.translation();
+      const now = performance.now();
+      if (
+        here.x < -0.24 &&
+        here.z < -0.185 &&
+        here.z > -0.262 &&
+        now > exitCooldown.current
+      ) {
+        const v = ball.linvel();
+        const speed = Math.max(2.4, Math.hypot(v.x, v.z));
+        ball.setLinvel({ x: -0.32 * speed, y: 0, z: 0.95 * speed }, true);
+        exitCooldown.current = now + 500;
+      }
+    }
+
     // The ball has rolled back down the lane onto the plunger: re-arm it so the
     // spring can be pulled again.
     if (
@@ -1014,11 +1037,11 @@ function Cabinet() {
       {/* Funnels, matching their colliders. */}
       {[1, -1].map((side) => {
         const pts: [number, number][] = [
-          // Upper tip stands clear of the side wall, so a ball that gets in there
-          // can pass through rather than being trapped.
-          [0.08, M(side * 0.2)],
+          // Upper end meets the side wall, so nothing can perch on the tip or slip
+          // behind it.
+          [0.04, side > 0 ? HALF_W - 0.012 : DIVIDER_Z + 0.008],
           [0.2, M(side * 0.16)],
-          // Lower end lands on the flipper hinge: no gap for the ball to slip into.
+          // Lower end lands on the flipper hinge.
           [0.34, M(side * 0.112)],
         ];
         return pts.slice(0, -1).map(([x0, z0], i) => {
