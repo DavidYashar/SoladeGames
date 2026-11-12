@@ -238,16 +238,6 @@ function Slate() {
         </mesh>
       ))}
 
-      {[-1, 1].map((side) => (
-        <mesh
-          key={side}
-          position={[0, PLAY.y + 0.009, side * (HALF_W - 0.012)]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <planeGeometry args={[PLAY.l - 0.12, 0.004]} />
-          <meshBasicMaterial color={side > 0 ? NEON : NEON_VIOLET} toneMapped={false} />
-        </mesh>
-      ))}
     </group>
   );
 }
