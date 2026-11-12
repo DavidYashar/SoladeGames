@@ -332,23 +332,27 @@ function Bumper({
 }
 
 const LANE_MAP = {
-  LaneWall: PART_METAL,
-  Lip: PART_CREAM,
-  Rivet0: PART_STEEL,
-  Rivet1: PART_STEEL,
-  Rivet2: PART_STEEL,
-  Rivet3: PART_STEEL,
+  Arm: PART_METAL,
+  ArmRun: PART_METAL,
+  ArmElbow: PART_METAL,
+  Border: PART_CREAM,
+  BorderRun: PART_CREAM,
+  BorderElbow: PART_CREAM,
+  Hinge: PART_CREAM,
+  Screw: PART_STEEL,
 };
+
+const ARM_ROTATION = Math.PI;
+
 
 /** The black curved guide that carries the ball down to a flipper. */
 function LaneWall({ side }: { side: 1 | -1 }) {
   return (
     <GltfPart
-      url="/models/pinball/lane_wall.glb"
+      url={side > 0 ? "/models/pinball/lane_arm.glb" : "/models/pinball/lane_arm_right.glb"}
       mapping={LANE_MAP}
-      position={[0.19, PLAY.y + 0.006, M(side * 0.16)]}
-      rotation={[0, side > 0 ? 1.88 : -1.88, 0]}
-      scale={1.9}
+      position={[0.34, PLAY.y + 0.004, M(side * 0.112)]}
+      rotation={[0, ARM_ROTATION, 0]}
     />
   );
 }
@@ -381,10 +385,9 @@ function Slingshot({ side }: { side: 1 | -1 }) {
 function FlipperMesh({ side }: { side: 1 | -1 }) {
   const mapping = useMemo(
     () => ({
-      Rubber: PART_CREAM,
-      Bat: PART_RED,
-      Hub: PART_STEEL,
-      HubRing: PART_METAL,
+      FlipperBorder: PART_CREAM,
+      Flipper: PART_RED,
+      PivotScrew: PART_STEEL,
     }),
     [],
   );
@@ -1269,7 +1272,8 @@ useGLTF.preload("/models/pinball/bumper.glb");
 useGLTF.preload("/models/pinball/flipper.glb");
 useGLTF.preload("/models/pinball/post.glb");
 useGLTF.preload("/models/pinball/slingshot.glb");
-useGLTF.preload("/models/pinball/lane_wall.glb");
+useGLTF.preload("/models/pinball/lane_arm.glb");
+useGLTF.preload("/models/pinball/lane_arm_right.glb");
 
 export function PinballTable() {
   const [score, setScore] = useState(0);

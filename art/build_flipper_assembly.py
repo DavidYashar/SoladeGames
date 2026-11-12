@@ -1,9 +1,15 @@
-"""Rebuild the flipper and lane wall to match the reference drawing.
+"""The flipper assembly, built to the reference drawing.
 
     blender -b --python art/build_flipper_assembly.py
 
-The wall runs straight down from the side rail, then bends through a quarter turn and
-ends exactly at the flipper's pivot. The flipper's origin is that pivot.
+Two assets, both with their origin at the pivot:
+
+    flipper.glb    red tapered capsule with a cream border and a pivot screw
+    lane_arm.glb   black bent arm with a silver border, four screws and a white hinge
+
+The arm is an obtuse bend: a long run, a 120 degree bend, then a short diagonal into
+the pivot. It is assembled from overlapping primitives rather than one swept polygon,
+so it cannot self-intersect.
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ def clear() -> None:
     bpy.ops.object.delete(use_global=False)
 
 
-def apply_bevel(obj, width: float, segments: int = 4) -> None:
+def bevel(obj, width: float, segments: int = 4) -> None:
     bpy.context.view_layer.objects.active = obj
     mod = obj.modifiers.new("Bevel", "BEVEL")
     mod.width = width
@@ -43,18 +49,72 @@ def smooth(obj, angle: float = math.radians(40)) -> None:
     obj.select_set(False)
 
 
-def solid_from_outline(name: str, points, thickness: float):
-    mesh = bpy.data.meshes.new(name + "Mesh")
-    mesh.from_pydata([(x, y, 0) for x, y in points], [], [list(range(len(points)))])
-    mesh.update()
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    mod = obj.modifiers.new("Solidify", "SOLIDIFY")
-    mod.thickness = thickness
-    mod.offset = 0.0
+def capsule(name: str, length: float, r_base: float, r_tip: float, height: float):
+    """A tapered pill lying along +X, centred on the X axis."""
+    bpy.ops.mesh.primitive_cone_add(
+        vertices=40, radius1=r_base, radius2=r_tip, depth=length, location=(length / 2, 0, 0)
+    )
+    body = bpy.context.active_object
+    body.name = name
+    body.rotation_euler = (0, math.radians(90), 0)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+
+    parts = [body]
+    for label, x, r in (("Base", 0.0, r_base), ("Tip", length, r_tip)):
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=32, ring_count=20, radius=r, location=(x, 0, 0))
+        cap = bpy.context.active_object
+        cap.name = f"{name}{label}"
+        parts.append(cap)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for part in parts:
+        part.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+    joined = bpy.context.active_object
+    joined.name = name
+
+    # Flatten to a plate and round the rim.
+    joined.scale = (1.0, 1.0, height / (2 * max(r_base, r_tip)))
+    bpy.context.view_layer.objects.active = joined
+    bpy.ops.object.transform_apply(scale=True)
+    return joined
+
+
+def bar(name: str, x0, y0, x1, y1, width: float, height: float):
+    """A flat bar from (x0,y0) to (x1,y1), thickness `height` in Z."""
+    dx, dy = x1 - x0, y1 - y0
+    length = math.hypot(dx, dy)
+    angle = math.atan2(dy, dx)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=((x0 + x1) / 2, (y0 + y1) / 2, 0))
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.scale = (length, width, height)
+    obj.rotation_euler = (0, 0, angle)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.ops.object.transform_apply(scale=True, rotation=True)
+    bevel(obj, min(width, height) * 0.35, 3)
     return obj
+
+
+def screw(name: str, x: float, y: float, radius: float, z: float):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=radius, depth=0.004, location=(x, y, z))
+    head = bpy.context.active_object
+    head.name = name
+    bevel(head, radius * 0.18, 2)
+
+    slots = []
+    for rot in (0, math.pi / 2):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y, z + 0.0022))
+        slot = bpy.context.active_object
+        slot.name = f"{name}Slot{rot}"
+        slot.scale = (radius * 1.5, radius * 0.18, 0.0012)
+        slot.rotation_euler = (0, 0, rot)
+        bpy.context.view_layer.objects.active = slot
+        bpy.ops.object.transform_apply(scale=True, rotation=True)
+        slots.append(slot)
+    return [head] + slots
 
 
 def export(name: str, objects: list) -> None:
@@ -76,176 +136,93 @@ def export(name: str, objects: list) -> None:
 
 
 # ---------------------------------------------------------------- flipper
-def bat_outline(scale: float) -> list[tuple[float, float]]:
-    """Smooth tapered bat: pivot at the origin, rounded tip, widening at the base."""
-    length = 0.104 * scale
-    tip = 0.096 * scale
-    pts: list[tuple[float, float]] = []
-
-    def half_width(x: float) -> float:
-        t = max(0.0, min(1.0, x / length))
-        return (0.0145 - 0.0062 * t) * scale
-
-    # Base, rounded around the pivot.
-    pts.append((0.0, -0.009 * scale))
-    steps = 14
-    for i in range(steps + 1):
-        x = 0.006 * scale + (tip - 0.006 * scale) * (i / steps)
-        pts.append((x, half_width(x)))
-    # Rounded tip.
-    cap_r = half_width(tip)
-    for i in range(1, 12):
-        a = math.pi / 2 - (i / 12) * math.pi
-        pts.append((tip + math.cos(a) * cap_r, math.sin(a) * cap_r))
-    for i in range(steps, -1, -1):
-        x = 0.006 * scale + (tip - 0.006 * scale) * (i / steps)
-        pts.append((x, -half_width(x)))
-    pts.append((0.0, 0.009 * scale))
-    return pts
-
-
 def build_flipper() -> None:
     clear()
 
-    bat = solid_from_outline("Bat", bat_outline(1.0), 0.013)
-    apply_bevel(bat, 0.0045, 5)
+    body = capsule("Flipper", 0.082, 0.0135, 0.0105, 0.016)
+    bevel(body, 0.003, 4)
+    smooth(body)
 
-    outline = bat_outline(1.075)
-    rubber = solid_from_outline("Rubber", outline, 0.0075)
-    apply_bevel(rubber, 0.0035, 4)
+    border = capsule("FlipperBorder", 0.088, 0.0158, 0.0128, 0.009)
+    border.location = (0, 0, -0.003)
+    bevel(border, 0.0025, 4)
+    smooth(border)
 
-    # Pivot screw.
-    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.0072, depth=0.02, location=(0, 0, 0))
-    screw = bpy.context.active_object
-    screw.name = "Screw"
-    apply_bevel(screw, 0.0012, 3)
-
-    bpy.ops.mesh.primitive_torus_add(
-        major_radius=0.0092, minor_radius=0.0016, major_segments=32, minor_segments=10,
-        location=(0, 0, 0),
-    )
-    rim = bpy.context.active_object
-    rim.name = "Rim"
-
-    for obj in (bat, rubber, screw, rim):
+    pivot = screw("PivotScrew", 0.0, 0.0, 0.0072, 0.009)
+    for obj in pivot:
         smooth(obj)
 
-    for obj in (screw, rim):
-        obj.rotation_euler = (math.radians(90), 0, 0)
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-
-    export("flipper", [bat, rubber, screw, rim])
+    export("flipper", [body, border] + pivot)
 
 
-# ---------------------------------------------------------------- lane wall
-def wall_path() -> list[tuple[float, float, float]]:
-    """Centreline of the wall: straight run, quarter turn, short run to the pivot.
-
-    Returns (x, y, normal angle) samples, from the top of the wall down to its end.
-    """
-    pts: list[tuple[float, float, float]] = []
-    # Straight section, going down the table.
-    for i in range(12):
-        t = i / 11
-        pts.append((0.0, 0.2 - 0.12 * t, math.pi / 2))
-    # Quarter turn: centre at (0.075, 0.08), radius 0.075.
-    for i in range(1, 15):
-        a = math.pi - (i / 14) * (math.pi / 2)
-        pts.append((0.075 + math.cos(a) * 0.075, 0.08 + math.sin(a) * 0.075, a - math.pi / 2))
-    # Short run into the pivot.
-    for i in range(1, 6):
-        t = i / 5
-        pts.append((0.075 + 0.055 * t, 0.005 - 0.005 * t, 0.0))
-    return pts
-
-
-def build_lane_wall() -> None:
+# ---------------------------------------------------------------- lane arm
+def build_arm() -> None:
     clear()
 
-    thickness = 0.011
-    height = 0.026
-    pts = wall_path()
+    # 120 degree bend: long vertical run, then a short diagonal into the pivot.
+    bend = (0.108, 0.062)
+    top = (0.30, 0.062)
 
-    verts: list[tuple[float, float, float]] = []
-    for x, y, normal in pts:
-        nx = math.cos(normal) * thickness
-        ny = math.sin(normal) * thickness
-        verts.extend(
-            [
-                (x - nx, y - ny, 0),
-                (x + nx, y + ny, 0),
-                (x - nx, y - ny, height),
-                (x + nx, y + ny, height),
-            ]
-        )
+    arm = bar("Arm", 0.0, 0.0, bend[0], bend[1], 0.023, 0.016)
+    run = bar("ArmRun", top[0], top[1], bend[0], bend[1], 0.023, 0.016)
 
-    faces = []
-    for i in range(len(pts) - 1):
-        b = i * 4
-        n = (i + 1) * 4
-        faces += [
-            (b + 0, b + 1, n + 1, n + 0),
-            (b + 2, n + 2, n + 3, b + 3),
-            (b + 0, n + 0, n + 2, b + 2),
-            (b + 1, b + 3, n + 3, n + 1),
-        ]
-    faces.append((0, 2, 3, 1))
-    last = (len(pts) - 1) * 4
-    faces.append((last + 0, last + 1, last + 3, last + 2))
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=32, radius=0.0115, depth=0.016, location=(bend[0], bend[1], 0)
+    )
+    elbow = bpy.context.active_object
+    elbow.name = "ArmElbow"
 
-    mesh = bpy.data.meshes.new("WallMesh")
-    mesh.from_pydata(verts, [], faces)
-    mesh.update()
-    wall = bpy.data.objects.new("LaneWall", mesh)
-    bpy.context.collection.objects.link(wall)
-    apply_bevel(wall, 0.002, 3)
+    # Silver border: the same shapes, slightly larger and thinner, sitting under.
+    border_arm = bar("Border", -0.0015, -0.0025, bend[0] + 0.0015, bend[1] + 0.0025, 0.028, 0.009)
+    border_arm.location.z = -0.004
+    border_run = bar("BorderRun", top[0], top[1], bend[0], bend[1], 0.028, 0.009)
+    border_run.location.z = -0.004
+    bpy.ops.mesh.primitive_cylinder_add(
+        vertices=32, radius=0.0142, depth=0.009, location=(bend[0], bend[1], -0.004)
+    )
+    border_elbow = bpy.context.active_object
+    border_elbow.name = "BorderElbow"
 
-    # Cream lip along the inner edge (the side the ball runs on).
-    lip_verts = []
-    for x, y, normal in pts:
-        nx = math.cos(normal) * (thickness + 0.0012)
-        ny = math.sin(normal) * (thickness + 0.0012)
-        lip_verts.extend(
-            [
-                (x - nx, y - ny, height),
-                (x + nx, y + ny, height),
-                (x - nx, y - ny, height + 0.004),
-                (x + nx, y + ny, height + 0.004),
-            ]
-        )
-    lip_faces = []
-    for i in range(len(pts) - 1):
-        b = i * 4
-        n = (i + 1) * 4
-        lip_faces.append((b + 2, n + 2, n + 3, b + 3))
-    lip = bpy.data.meshes.new("LipMesh")
-    lip.from_pydata(lip_verts, [], lip_faces)
-    lip.update()
-    lip_obj = bpy.data.objects.new("Lip", lip)
-    bpy.context.collection.objects.link(lip_obj)
+    # White hinge ring at the pivot.
+    bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.0105, minor_radius=0.0028, major_segments=36, minor_segments=12,
+        location=(0.0, 0.0, 0.004),
+    )
+    hinge = bpy.context.active_object
+    hinge.name = "Hinge"
 
-    # Screws down the straight section.
+    # Four screws along the diagonal section.
     screws = []
     for i in range(4):
-        y = 0.175 - i * 0.026
-        bpy.ops.mesh.primitive_cylinder_add(
-            vertices=20, radius=0.0042, depth=0.006, location=(0.0, y, height * 0.55)
-        )
-        s = bpy.context.active_object
-        s.name = f"Screw{i}"
-        s.rotation_euler = (0, math.radians(90), 0)
-        bpy.context.view_layer.objects.active = s
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
-        apply_bevel(s, 0.0008, 2)
-        screws.append(s)
+        t = 0.22 + i * 0.19
+        x = bend[0] * (1 - t)
+        y = bend[1] * (1 - t)
+        screws += screw(f"Screw{i}", x, y, 0.0042, 0.009)
 
-    for obj in [wall, lip_obj] + screws:
+    for obj in [arm, run, elbow, border_arm, border_run, border_elbow, hinge] + screws:
         smooth(obj)
 
-    export("lane_wall", [wall, lip_obj] + screws)
+    parts = [arm, run, elbow, border_arm, border_run, border_elbow, hinge] + screws
+    export("lane_arm", parts)
+
+    # Mirror across the table centreline for the other side.
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in parts:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.duplicate()
+    mirrored = list(bpy.context.selected_objects)
+    for obj in mirrored:
+        obj.scale = (1.0, -1.0, 1.0)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(scale=True)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.normals_make_consistent(inside=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    export("lane_arm_right", mirrored)
 
 
 build_flipper()
-build_lane_wall()
-print("assembly rebuilt")
+build_arm()
+print("assembly built")
