@@ -54,6 +54,19 @@ const NEON_VIOLET = "#a06bff";
 const AMBER = "#ffd166";
 
 const BALL_R = 0.0135;
+
+/**
+ * Bumper positions, from the layout sheets: three in a triangle across the upper
+ * field, and two larger ones flanking the middle. Both the visuals and the colliders
+ * read this list, so they cannot drift apart.
+ */
+const BUMPERS: { x: number; dz: number; color: string; big: boolean }[] = [
+  { x: -0.24, dz: -0.085, color: NEON, big: true },
+  { x: -0.24, dz: 0.085, color: NEON, big: true },
+  { x: -0.335, dz: 0, color: NEON_VIOLET, big: true },
+  { x: -0.02, dz: -0.15, color: AMBER, big: true },
+  { x: -0.02, dz: 0.15, color: AMBER, big: true },
+];
 const PLUNGER_X = HALF_L - 0.115;
 
 /** Flipper geometry in radians. Each bat sweeps exactly 30 degrees and comes back. */
@@ -65,6 +78,8 @@ const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
 
 const shared = {
   ball: null as RAPIER.RigidBody | null,
+  /** Bumper index -> time it was last struck, for the light. */
+  flash: {} as Record<number, number>,
   charge: 0,
   plungerHeld: false,
   score: 0,
@@ -120,7 +135,31 @@ function Slate() {
 }
 
 /** Pop bumper: drum, neon cap, and a skirt in the colour of the reference objects. */
-function Bumper({ x, z, color = NEON }: { x: number; z: number; color?: string }) {
+function Bumper({
+  id,
+  x,
+  z,
+  color = NEON,
+}: {
+  id: number;
+  x: number;
+  z: number;
+  color?: string;
+}) {
+  const cap = useRef<THREE.MeshStandardMaterial>(null);
+
+  useFrame(() => {
+    // Flash, then fade back down over about a third of a second.
+    const struck = shared.flash[id] ?? 0;
+    const since = (performance.now() - struck) / 1000;
+    const level = since < 0.35 ? 1 - since / 0.35 : 0;
+    if (cap.current) {
+      cap.current.emissiveIntensity = 1.5 + level * 6;
+      cap.current.color.setHex(0xffffff);
+      cap.current.color.lerp(new THREE.Color(color), 1 - level * 0.7);
+    }
+  });
+
   return (
     <group position={[x, PLAY.y, z]}>
       <mesh position={[0, 0.016, 0]} castShadow receiveShadow>
@@ -130,6 +169,7 @@ function Bumper({ x, z, color = NEON }: { x: number; z: number; color?: string }
       <mesh position={[0, 0.035, 0]} castShadow>
         <cylinderGeometry args={[0.03, 0.028, 0.008, 28]} />
         <meshStandardMaterial
+          ref={cap}
           color={color}
           emissive={color}
           emissiveIntensity={1.5}
@@ -374,6 +414,8 @@ function Pinball({
   const acc = useRef(0);
   const events = useRef<RAPIER.EventQueue | null>(null);
   const scoring = useRef<Record<number, number>>({});
+  const bumperAt = useRef(new Map<number, { x: number; z: number }>()).current;
+  const bumperHandles = useRef(new Map<number, number>());
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
   const mode = useRef<"idle" | "play">("idle");
@@ -477,21 +519,20 @@ function Pinball({
         }
       }
 
-      // Bumpers: three large, as in the layout, plus the top one.
-      const bumperAt = (x: number, z: number) => {
+      // Bumpers: one collider each, from the shared list.
+      const bumperForHandle = new Map<number, { x: number; z: number }>();
+      BUMPERS.forEach((b) => {
+        const z = M(b.dz);
         const c = w.createCollider(
-          RAPIER.ColliderDesc.cylinder(0.03, 0.03)
-            .setTranslation(x, PLAY.y + 0.03, z)
-            .setFriction(0.05)
-            .setRestitution(1.25),
+          RAPIER.ColliderDesc.cylinder(0.032, 0.03)
+            .setTranslation(b.x, PLAY.y + 0.032, z)
+            .setFriction(0.02)
+            .setRestitution(0.9),
         );
         scoring.current[c.handle] = 100;
-      };
-      bumperAt(-0.15, M(-0.08));
-      bumperAt(-0.15, M(0.08));
-      bumperAt(-0.27, M(0));
-      bumperAt(-0.33, M(-0.145));
-      bumperAt(-0.33, M(0.145));
+        bumperForHandle.set(c.handle, { x: b.x, z });
+        bumperHandles.current.set(c.handle, BUMPERS.indexOf(b));
+      });
 
       // Drop targets: a diamond of six in the middle of the field.
       for (const [tx, tz] of [
@@ -766,6 +807,27 @@ function Pinball({
           shared.score += value;
           shared.onScore?.(shared.score);
         }
+
+        // A bumper does not just bounce the ball, it fires it away.
+        const bumper = bumperAt.get(h1) ?? bumperAt.get(h2);
+        if (bumper) {
+          const id = bumperHandles.current.get(h1) ?? bumperHandles.current.get(h2);
+          if (id !== undefined) shared.flash[id] = performance.now();
+
+          const t = ball.translation();
+          const dx = t.x - bumper.x;
+          const dz = t.z - bumper.z;
+          const len = Math.hypot(dx, dz) || 1;
+          const v = ball.linvel();
+          const kicked = {
+            x: v.x + (dx / len) * 2.6,
+            y: 0,
+            z: v.z + (dz / len) * 2.6,
+          };
+          const speed = Math.hypot(kicked.x, kicked.z);
+          const scale = Math.min(6.2, Math.max(2.4, speed)) / (speed || 1);
+          ball.setLinvel({ x: kicked.x * scale, y: 0, z: kicked.z * scale }, true);
+        }
       });
     }
 
@@ -881,11 +943,9 @@ function Cabinet() {
         </mesh>
       ))}
 
-      <Bumper x={-0.15} z={M(-0.08)} />
-      <Bumper x={-0.15} z={M(0.08)} />
-      <Bumper x={-0.27} z={M(0)} color={NEON_VIOLET} />
-      <Bumper x={-0.33} z={M(-0.145)} color={AMBER} />
-      <Bumper x={-0.33} z={M(0.145)} color={AMBER} />
+      {BUMPERS.map((b, i) => (
+        <Bumper key={i} id={i} x={b.x} z={M(b.dz)} color={b.color} />
+      ))}
 
       <DropTargets />
       <RolloverRing z={M(0)} />
