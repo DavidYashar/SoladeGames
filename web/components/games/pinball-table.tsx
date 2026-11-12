@@ -922,16 +922,18 @@ function Pinball({
     if (mode.current === "play") {
       const here = ball.translation();
       const now = performance.now();
+      const v = ball.linvel();
+      // Strictly inside the lane (not the field) and still travelling up it.
       if (
         here.x < -0.24 &&
-        here.z < -0.185 &&
+        here.z < DIVIDER_Z - 0.004 &&
         here.z > -0.262 &&
+        v.x < 0.3 &&
         now > exitCooldown.current
       ) {
-        const v = ball.linvel();
         const speed = Math.max(2.4, Math.hypot(v.x, v.z));
         ball.setLinvel({ x: -0.32 * speed, y: 0, z: 0.95 * speed }, true);
-        exitCooldown.current = now + 500;
+        exitCooldown.current = now + 700;
       }
     }
 
