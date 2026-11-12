@@ -115,6 +115,16 @@ const PART_RED = new THREE.MeshStandardMaterial({
   roughness: 0.3,
   metalness: 0.12,
 });
+const PART_AMBER = new THREE.MeshStandardMaterial({
+  color: "#e08a1e",
+  roughness: 0.3,
+  metalness: 0.08,
+});
+const PART_DARK = new THREE.MeshStandardMaterial({
+  color: "#15181c",
+  roughness: 0.5,
+  metalness: 0.15,
+});
 const PART_CREAM = new THREE.MeshStandardMaterial({
   color: "#f1ebdf",
   roughness: 0.42,
@@ -360,27 +370,33 @@ function LaneWall({ side }: { side: 1 | -1 }) {
 }
 
 const SLING_MAP = {
-  Slingshot: PART_RED,
-  Border: PART_CREAM,
-  Screw0: PART_STEEL,
-  Screw1: PART_STEEL,
-  Screw2: PART_STEEL,
+  Face: PART_AMBER,
+  Stripe: PART_DARK,
+  Rim: PART_CREAM,
+  Screw: PART_STEEL,
+};
+
+/** Where each plate sits: the inside corner of the L formed by its arm. */
+const SLING_POS: Record<1 | -1, [number, number]> = {
+  1: [0.2, 0.232],
+  [-1]: [0.2, -0.177],
 };
 
 /** The red triangle from the icon set: a kicker beside each flipper. */
 function Slingshot({ side }: { side: 1 | -1 }) {
-  // Sits just inside the funnel, its long edge following the funnel's slope.
+  const [x, z] = SLING_POS[side];
   return (
     <GltfPart
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
-      // The left rail's visible inner face is at +0.270 (its slab is centred on 0.276);
-      // the divider's is at -0.203. Those are the lines the bases sit on.
-      position={[side > 0 ? -0.075 : 0.04, PLAY.y + 0.009, side > 0 ? 0.27 : -0.203]}
-      rotation={[0, side > 0 ? 0 : Math.PI, 0]}
+      position={[x, PLAY.y + 0.008, z]}
+      // Wide edge faces the middle of the field, apex into the corner of the arm.
+      rotation={[0, side > 0 ? Math.PI : 0, 0]}
     />
   );
 }
+
+
 
 /**
  * Flipper: the long tapered bat from the sample, with a dark rubber band around the
@@ -670,20 +686,8 @@ function Pinball({
         );
       }
 
-      // Slingshot plates: one collider per triangle, centred on the plate itself.
-      // The triangle spans x -0.075..0.04 with its base on the rail, so its centroid
-      // sits at x = -0.017 and 25 mm in from the rail.
-      for (const side of [1, -1] as const) {
-        const railZ = side > 0 ? 0.27 : -0.203;
-        const c = w.createCollider(
-          RAPIER.ColliderDesc.cuboid(0.052, 0.028, 0.028)
-            .setTranslation(-0.017, PLAY.y + 0.028, railZ - side * 0.025)
-            .setFriction(0.03)
-            .setRestitution(0.9),
-        );
-        scoring.current[c.handle] = 25;
-        slingSides.current.set(c.handle, side);
-      }
+      // The slingshot plates are deliberately NOT solid: a solid body trapped the
+      // ball against them. They kick by proximity instead, below.
 
       // Funnels: two walls per side running from the side rail down to the flipper
       // pivot. Anything coming down the side is delivered onto a flipper, which is
@@ -1133,11 +1137,10 @@ function Pinball({
       });
 
       for (const side of [1, -1] as const) {
-        const railZ = side > 0 ? 0.27 : -0.203;
-        const plateZ = railZ - side * 0.025;
-        const dx = t.x + 0.017;
+        const [px, plateZ] = SLING_POS[side];
+        const dx = t.x - px;
         const dz = t.z - plateZ;
-        if (Math.hypot(dx, dz) > 0.06) continue;
+        if (Math.hypot(dx, dz) > 0.062) continue;
         if (now < (slingCooldown.current[side] ?? 0)) continue;
         slingCooldown.current[side] = now + 260;
 
@@ -1150,7 +1153,7 @@ function Pinball({
         shared.score += 25;
         shared.onScore?.(shared.score);
 
-        ball.setTranslation({ x: t.x, y: PLAY.y + 0.025, z: plateZ + inward * 0.05 }, true);
+        ball.setTranslation({ x: t.x, y: PLAY.y + 0.025, z: plateZ + inward * 0.06 }, true);
         ball.setLinvel({ x: vx, y: 0.15, z: vz }, true);
       }
     }
