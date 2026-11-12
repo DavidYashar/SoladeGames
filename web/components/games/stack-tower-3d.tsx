@@ -552,7 +552,7 @@ export function StackTowerGame() {
       {sim && (
         <Canvas
           key={generation}
-          shadows
+          shadows="percentage"
           camera={camera}
           dpr={[1, 2]}
           gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}

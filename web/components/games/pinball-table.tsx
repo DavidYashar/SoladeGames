@@ -1453,7 +1453,7 @@ export function PinballTable() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#050506]">
       <Canvas
-        shadows
+        shadows="percentage"
         dpr={[1, 2]}
         camera={{ position: [1.18, 2.26, 0], fov: 40, near: 0.02, far: 40 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}

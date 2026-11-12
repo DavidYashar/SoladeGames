@@ -983,7 +983,7 @@ export function PoolTable() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#050506]">
       <Canvas
-        shadows
+        shadows="percentage"
         dpr={[1, 2]}
         camera={{ position: [2.96, 4.3, 0], fov: 42, near: 0.05, far: 60 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
