@@ -124,7 +124,7 @@ def main() -> None:
 
     # Long edge on the right, flat bottom, hypotenuse to the apex: the reference form.
     tri = [(-0.05, -0.052), (0.055, -0.052), (0.016, 0.088)]
-    face_outline = rounded_triangle(tri, 0.011)
+    face_outline = rounded_triangle(tri, 0.006, 8)
 
     # Thickness grows inward to outward, so every layer shows beyond the one above it.
     rim = extruded("Rim", scaled(face_outline, 1.18), 0.013, 0.0)
