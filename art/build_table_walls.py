@@ -35,14 +35,25 @@ DIVIDER_Z = -HALF_W + 0.012 + LANE_W - 0.008
 CENTER_Z = (HALF_W - 0.012 + DIVIDER_Z + 0.008) / 2
 M = lambda dz: CENTER_Z + dz
 
-DIVIDER_FROM = HALF_L - 0.1
-DIVIDER_TO = -0.22
-TOP_RAMP = (-0.378, -0.2)
+# ---------------------------------------------------------------------------
+# Junctions. Every corner and meeting point of the wall run has a name.
+# ---------------------------------------------------------------------------
+NEAR_LEFT = (HALF_L, HALF_W)      # near end of the left rail
+NEAR_RIGHT = (HALF_L, -HALF_W)    # near end of the corridor rail
+FAR = (-0.378, -0.2)              # the tip where the head arc meets the lane exit
+DIVIDER_NEAR = (HALF_L - 0.1, DIVIDER_Z)   # divider's near end
+DIVIDER_FAR = (-0.22, DIVIDER_Z)           # divider's far end
+LANE_RAIL_END = (-0.31, -HALF_W)   # corridor rail -> lane exit
 
-# Where the corridor's outer rail ends and the exit wall begins. One named point used
-# by both walls, so they stay fused instead of being computed separately.
-LANE_RAIL_Z = -HALF_W
-LANE_RAIL_END = (-0.31, LANE_RAIL_Z)
+# The head arc runs from the left rail round to FAR. Its centre is solved so that the
+# circle passes through both: fixed in x, with z chosen to make the two ends equidistant.
+HEAD_CX = -0.31
+_a = HALF_W
+_fx, _fz = FAR
+HEAD_CZ = (_a ** 2 - (_fx - HEAD_CX) ** 2 - _fz ** 2) / (2 * (_a - _fz))
+HEAD_C = (HEAD_CX, HEAD_CZ)
+HEAD_R = _a - HEAD_CZ
+HEAD_START = (HEAD_CX, HALF_W)  # where the arc meets the left rail
 
 WALL_H = 0.042
 WALL_W = 0.012
@@ -131,15 +142,15 @@ def build_wall(prefix: str, world_points):
 
 
 def head_arc(steps: int = 48):
-    cx, cz = -0.31, M(0)
-    r = math.hypot(TOP_RAMP[0] - cx, TOP_RAMP[1] - cz)
-    a0 = math.pi / 2
-    a1 = math.atan2(TOP_RAMP[1] - cz, TOP_RAMP[0] - cx)
+    """Arc from HEAD_START round to FAR, on the circle those two points define."""
+    cx, cz = HEAD_C
+    a0 = math.atan2(HEAD_START[1] - cz, HEAD_START[0] - cx)
+    a1 = math.atan2(FAR[1] - cz, FAR[0] - cx)
     if a1 < a0:
         a1 += math.pi * 2
     return [
-        (cx + r * math.cos(a0 + (i / steps) * (a1 - a0)),
-         cz + r * math.sin(a0 + (i / steps) * (a1 - a0)))
+        (cx + HEAD_R * math.cos(a0 + (i / steps) * (a1 - a0)),
+         cz + HEAD_R * math.sin(a0 + (i / steps) * (a1 - a0)))
         for i in range(steps + 1)
     ]
 
@@ -148,16 +159,14 @@ def main() -> None:
     clear()
 
     walls = {
-        # Perimeter: the same profile as the internal walls.
-        "outerLeft": [(-HALF_L, HALF_W), (HALF_L, HALF_W)],
-        # Runs the full length so it meets the head arc: the lane wall used to stop
-        # at x = 0.3 and left the right side of the field open.
-        "outerLane": [(HALF_L, LANE_RAIL_Z), LANE_RAIL_END],
-        "outerNear": [(HALF_L, HALF_W), (HALF_L, -HALF_W)],
+        # Perimeter, each wall a pair of named junctions.
+        "outerLeft": [NEAR_LEFT, HEAD_START],
+        "outerLane": [NEAR_RIGHT, LANE_RAIL_END],
+        "outerNear": [NEAR_LEFT, NEAR_RIGHT],
         # Internal.
-        "divider": [(DIVIDER_FROM, DIVIDER_Z), (DIVIDER_TO, DIVIDER_Z)],
+        "divider": [DIVIDER_NEAR, DIVIDER_FAR],
         "head": head_arc(),
-        "laneEnd": [LANE_RAIL_END, TOP_RAMP],
+        "laneEnd": [LANE_RAIL_END, FAR],
     }
 
     parts = []
