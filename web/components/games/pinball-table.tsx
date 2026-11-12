@@ -61,10 +61,10 @@ const BALL_R = 0.0135;
  * read this list, so they cannot drift apart.
  */
 const BUMPERS: { x: number; dz: number; color: string; big: boolean }[] = [
-  // Upper arc, from the layout sheets.
-  { x: -0.24, dz: -0.085, color: NEON, big: true },
-  { x: -0.24, dz: 0.085, color: NEON, big: true },
-  { x: -0.335, dz: 0, color: NEON_VIOLET, big: true },
+  // Upper cluster: two side by side and one below, as in the layout sheet.
+  { x: -0.18, dz: -0.095, color: NEON, big: true },
+  { x: -0.18, dz: 0.095, color: NEON, big: true },
+  { x: -0.27, dz: 0, color: NEON_VIOLET, big: true },
   // Centre pair, sitting in the rollover ring above the flippers: anything coming
   // back down the middle is sent up the table again.
   { x: -0.02, dz: 0, color: AMBER, big: true },
@@ -86,7 +86,10 @@ const shared = {
   charge: 0,
   plungerHeld: false,
   score: 0,
+  combo: 0,
+  comboAt: 0,
   onScore: null as ((v: number) => void) | null,
+  onCombo: null as ((v: number) => void) | null,
 };
 
 function seeded(seed: number): () => number {
@@ -403,9 +406,11 @@ function Post({ x, z }: { x: number; z: number }) {
 function Pinball({
   onScore,
   onCharge,
+  onCombo,
 }: {
   onScore: (v: number) => void;
   onCharge: (v: number) => void;
+  onCombo: (v: number) => void;
 }) {
   const { camera, gl } = useThree();
   const ballMesh = useRef<THREE.Mesh>(null);
@@ -502,9 +507,12 @@ function Pinball({
       // what keeps the ball alive.
       for (const side of [1, -1] as const) {
         const pts: [number, number][] = [
-          [0.04, M(side * 0.21)],
-          [0.16, M(side * 0.185)],
-          [0.27, M(side * 0.15)],
+          // Upper tip stands clear of the side wall, so a ball that gets in there
+          // can pass through rather than being trapped.
+          [0.08, M(side * 0.17)],
+          [0.2, M(side * 0.145)],
+          // Lower end lands on the flipper hinge: no gap for the ball to slip into.
+          [0.34, M(side * 0.112)],
         ];
         for (let i = 0; i < pts.length - 1; i += 1) {
           const [x0, z0] = pts[i];
@@ -519,10 +527,10 @@ function Pinball({
               .setFriction(0.05)
               .setRestitution(0.35),
           );
-          if (i === pts.length - 2) {
+          if (i === 0) {
             w.createCollider(
               RAPIER.ColliderDesc.cylinder(0.03, 0.009)
-                .setTranslation(x1, PLAY.y + 0.03, z1)
+                .setTranslation(x0, PLAY.y + 0.03, z0)
                 .setFriction(0.05)
                 .setRestitution(0.4),
             );
@@ -692,6 +700,7 @@ function Pinball({
         };
       };
       shared.onScore = onScore;
+      shared.onCombo = onCombo;
       setReady(true);
 
       // Keyboard: Space charges the plunger, arrows/A-D work the flippers.
@@ -770,6 +779,11 @@ function Pinball({
     const ball = shared.ball;
     if (!w || !ball) return;
 
+    if (shared.combo > 0 && performance.now() - shared.comboAt > 2600) {
+      shared.combo = 0;
+      shared.onCombo?.(0);
+    }
+
     if (shared.plungerHeld && mode.current === "idle") {
       shared.charge = Math.min(1, shared.charge + delta / 1.1);
       onCharge(shared.charge);
@@ -815,7 +829,9 @@ function Pinball({
         if (!started) return;
         const value = scoring.current[h1] ?? scoring.current[h2];
         if (value) {
-          shared.score += value;
+          // Each hit lands for more while the chain is warm.
+          const multiplier = 1 + shared.combo;
+          shared.score += value * multiplier;
           shared.onScore?.(shared.score);
         }
 
@@ -824,6 +840,10 @@ function Pinball({
         if (bumper) {
           const id = bumperHandles.current.get(h1) ?? bumperHandles.current.get(h2);
           if (id !== undefined) shared.flash[id] = performance.now();
+
+          shared.combo = Math.min(6, shared.combo + 1);
+          shared.comboAt = performance.now();
+          shared.onCombo?.(shared.combo);
 
           const t = ball.translation();
           const dx = t.x - bumper.x;
@@ -970,9 +990,12 @@ function Cabinet() {
       {/* Funnels, matching their colliders. */}
       {[1, -1].map((side) => {
         const pts: [number, number][] = [
-          [0.04, M(side * 0.21)],
-          [0.16, M(side * 0.185)],
-          [0.27, M(side * 0.15)],
+          // Upper tip stands clear of the side wall, so a ball that gets in there
+          // can pass through rather than being trapped.
+          [0.08, M(side * 0.17)],
+          [0.2, M(side * 0.145)],
+          // Lower end lands on the flipper hinge: no gap for the ball to slip into.
+          [0.34, M(side * 0.112)],
         ];
         return pts.slice(0, -1).map(([x0, z0], i) => {
           const [x1, z1] = pts[i + 1];
@@ -989,8 +1012,8 @@ function Cabinet() {
                 <boxGeometry args={[len, 0.04, 0.009]} />
                 <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
               </mesh>
-              {i === 2 - 1 ? (
-                <mesh position={[x1, PLAY.y + 0.02, z1]} castShadow>
+              {i === 0 ? (
+                <mesh position={[x0, PLAY.y + 0.02, z0]} castShadow>
                   <cylinderGeometry args={[0.009, 0.009, 0.04, 16]} />
                   <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
                 </mesh>
@@ -1056,6 +1079,7 @@ function Cabinet() {
 export function PinballTable() {
   const [score, setScore] = useState(0);
   const [charge, setCharge] = useState(0);
+  const [combo, setCombo] = useState(0);
   const [best, setBest] = useState(0);
 
   useEffect(() => {
@@ -1097,7 +1121,7 @@ export function PinballTable() {
         <directionalLight position={[1.2, 2.4, 1.2]} intensity={0.8} color="#ffe9c8" castShadow />
 
         <Cabinet />
-        <Pinball onScore={setScore} onCharge={setCharge} />
+        <Pinball onScore={setScore} onCharge={setCharge} onCombo={setCombo} />
 
         <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[16, 16]} />
@@ -1111,6 +1135,18 @@ export function PinballTable() {
           <div>
             <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Score</p>
             <p className="font-display text-2xl tabular-nums text-zinc-100">{score}</p>
+          </div>
+          <div className="text-center">
+            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+              Chain
+            </p>
+            <p
+              className={`font-display text-2xl tabular-nums ${
+                combo > 0 ? "text-amber-300" : "text-zinc-600"
+              }`}
+            >
+              x{1 + combo}
+            </p>
           </div>
           <div className="text-right">
             <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Best</p>
