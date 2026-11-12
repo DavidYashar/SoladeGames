@@ -67,6 +67,41 @@ Both origins sit on the pivot, so arm and flipper share one anchor. The flippers
 
 ---
 
+## 4b. Object pipeline: a PNG becomes the model
+
+For any new object, sending a transparent-background PNG is enough. The shape is
+traced from the artwork rather than modelled from guessed control points.
+
+```
+python  art/trace_plate.py            # PNG -> art/out/plate_contours.json
+blender -b --python art/build_plate_from_png.py   # json -> slingshot.glb
+```
+
+What the trace does:
+
+1. reads the alpha channel for the silhouette
+2. splits it into colour regions (cream casing, dark frame, amber face, metal screws)
+3. **fills the regions inside-out** (cream contains dark contains amber contains the
+   screws) so each layer's boundary is its outer edge only — tracing a ring directly
+   produces a self-intersecting mess
+4. keeps the farthest boundary pixel per angle bin, which removes the pixel staircase
+5. smooths, simplifies, converts to metres, and extrudes each layer at its own height
+
+Screws come from connected components of the metal pixels, filtered by size.
+
+### Placing the traced plate
+
+The plate is oriented from its own geometry, not by hand:
+
+- `SLING_CORNER` — centroid to the obtuse corner (94.7 deg), measured by fitting the
+  largest triangle to the traced convex hull
+- `SLING_BISECTOR_LEFT` / `SLING_BISECTOR_RIGHT` — that corner's bisector, one per side,
+  tuned independently
+- the bisector is turned onto `ARM_RUN`, so the obtuse corner's two edges straddle the
+  arm's upper run symmetrically
+- the plate position is then solved backwards so the obtuse corner lands on `ELBOW`,
+  which is why changing the bisector also moves the plate
+
 ## 5. Assets: Blender pipeline
 
 ```

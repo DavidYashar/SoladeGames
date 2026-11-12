@@ -398,7 +398,7 @@ const SLING_MAP = {
 const SLING_CORNER = { x: -0.0367, z: 0.0099 };   // centroid -> obtuse corner
 // One bisector per side: the two plates are turned independently.
 const SLING_BISECTOR_LEFT = { x: 0.017, z: -0.399 };    // left plate
-const SLING_BISECTOR_RIGHT = { x: 0.097, z: 0.399 };    // right plate, mirrored — adjust here
+const SLING_BISECTOR_RIGHT = { x: 0.527, z: 0.399 };    // right plate, mirrored — adjust here
 
 /** Elbow of each arm, where its two runs meet. */
 const ELBOW = { x: 0.232, z: 0.2595 };
