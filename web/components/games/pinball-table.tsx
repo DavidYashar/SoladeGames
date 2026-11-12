@@ -372,7 +372,9 @@ function Slingshot({ side }: { side: 1 | -1 }) {
     <GltfPart
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
-      position={[side > 0 ? -0.075 : 0.04, PLAY.y + 0.009, side > 0 ? 0.258 : -0.203]}
+      // The left rail's visible inner face is at +0.270 (its slab is centred on 0.276);
+      // the divider's is at -0.203. Those are the lines the bases sit on.
+      position={[side > 0 ? -0.075 : 0.04, PLAY.y + 0.009, side > 0 ? 0.27 : -0.203]}
       rotation={[0, side > 0 ? 0 : Math.PI, 0]}
     />
   );
@@ -666,7 +668,7 @@ function Pinball({
       for (const side of [1, -1] as const) {
         const c = w.createCollider(
           RAPIER.ColliderDesc.cuboid(0.058, 0.03, 0.03)
-            .setTranslation(-0.017, PLAY.y + 0.03, side > 0 ? 0.213 : -0.158)
+            .setTranslation(-0.017, PLAY.y + 0.03, side > 0 ? 0.225 : -0.158)
             .setFriction(0.04)
             .setRestitution(1.15),
         );
