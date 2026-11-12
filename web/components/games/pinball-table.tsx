@@ -380,12 +380,34 @@ const SLING_MAP = {
 /** Where each plate sits: the inside corner of the L formed by its arm. */
 // Midpoint of the arm's diagonal, which runs from the elbow (0.232, +/-0.2595) to
 // the flipper pivot (0.34, +/-0.1395). The plate nests there.
+// The plates sit in the corner where each arm bends. The elbow is at (0.232, +/-0.2595)
+// and the plate is pulled 45 mm in toward the middle of the field.
 const SLING_POS: Record<1 | -1, [number, number]> = {
-  1: [0.264, 0.18],
-  [-1]: [0.264, -0.125],
+  1: [0.2, 0.2276],
+  [-1]: [0.2, -0.1724],
 };
 
-/** The red triangle from the icon set: a kicker beside each flipper. */
+// Direction of the plate's longest edge in its own coordinates, taken from the trace
+// of the artwork (centre of the outline -> midpoint of its longest side).
+const SLING_BROAD = { x: 0.92, z: 0.39 };
+
+const FIELD_CENTRE = { x: 0, z: M(0) };
+
+/** Aim the plate's broad side at the middle of the field. */
+function slingAngle(side: 1 | -1): number {
+  const [x, z] = SLING_POS[side];
+  const dx = FIELD_CENTRE.x - x;
+  const dz = FIELD_CENTRE.z - z;
+  const len = Math.hypot(dx, dz) || 1;
+  const tx = dx / len;
+  const tz = dz / len;
+  return Math.atan2(
+    SLING_BROAD.z * tx - SLING_BROAD.x * tz,
+    SLING_BROAD.x * tx + SLING_BROAD.z * tz,
+  );
+}
+
+/** The amber plate traced from the artwork, one per arm corner. */
 function Slingshot({ side }: { side: 1 | -1 }) {
   const [x, z] = SLING_POS[side];
   return (
@@ -393,8 +415,7 @@ function Slingshot({ side }: { side: 1 | -1 }) {
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
       position={[x, PLAY.y + 0.008, z]}
-      // Point at the elbow, long axis following the diagonal of the arm.
-      rotation={[0, side > 0 ? 2.4 : 0.73, 0]}
+      rotation={[0, slingAngle(side), 0]}
     />
   );
 }
