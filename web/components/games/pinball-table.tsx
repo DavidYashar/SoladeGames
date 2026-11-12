@@ -97,8 +97,10 @@ const PLUNGER_X = HALF_L - 0.115;
 const FLIP_REST = 0.785;
 const FLIP_SWING = 0.524;
 const DOWNHILL = 1.5;
+const MAX_SPEED = 6.6;
 
 const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
+const FLIP_SPEED = 34;
 
 const PART_METAL = new THREE.MeshStandardMaterial({
   color: "#252a31",
@@ -183,6 +185,8 @@ const shared = {
   score: 0,
   slingKicks: 0,
   bumperKicks: 0,
+  /** Plate side -> time it was last struck, for the flash. */
+  slingFlash: { 1: 0, [-1]: 0 } as Record<number, number>,
   combo: 0,
   comboAt: 0,
   onScore: null as ((v: number) => void) | null,
@@ -346,13 +350,27 @@ function Bumper({
 /** The amber plate traced from the artwork, one per arm corner. */
 function Slingshot({ side }: { side: 1 | -1 }) {
   const { x, z, theta } = slingPlacement(side);
+  const group = useRef<THREE.Group>(null);
+
+  // A short kick pulse, so the boost is visible as well as felt.
+  useFrame(() => {
+    const g = group.current;
+    if (!g) return;
+    const struck = shared.slingFlash[side] ?? 0;
+    const since = (performance.now() - struck) / 1000;
+    const level = since < 0.22 ? 1 - since / 0.22 : 0;
+    g.scale.setScalar(1 + level * 0.16);
+  });
+
   return (
-    <GltfPart
-      url="/models/pinball/slingshot.glb"
-      mapping={SLING_MAP}
-      position={[x, PLAY.y + 0.008, z]}
-      rotation={[0, theta, 0]}
-    />
+    <group ref={group} position={[x, PLAY.y + 0.008, z]}>
+      <GltfPart
+        url="/models/pinball/slingshot.glb"
+        mapping={SLING_MAP}
+        position={[0, 0, 0]}
+        rotation={[0, theta, 0]}
+      />
+    </group>
   );
 }
 
@@ -624,6 +642,7 @@ function Pinball({
   const bumperHandles = useRef(new Map<number, number>());
   const slingSides = useRef(new Map<number, number>());
   const bumperCooldown = useRef<Record<number, number>>({});
+  const stalled = useRef(0);
   const slingCooldown = useRef<Record<number, number>>({});
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
@@ -819,8 +838,8 @@ function Pinball({
         w.createCollider(
           RAPIER.ColliderDesc.cuboid(FLIPPER.len / 2, 0.012, FLIPPER.width / 2)
             .setTranslation(FLIPPER.len / 2, 0, 0)
-            .setFriction(0.1)
-            .setRestitution(0.6),
+            .setFriction(0.06)
+            .setRestitution(0.78),
           body,
         );
         body.setRotation(quatFromY(side * FLIP_REST), true);
@@ -993,6 +1012,16 @@ function Pinball({
       world.current?.free();
       world.current = null;
       shared.ball = null;
+      // Drop the live handle too, and the debug hooks with it: a stale handle points
+      // into freed wasm memory and throws on the next read.
+      liveBall.current = null;
+      const w = window as unknown as Record<string, unknown>;
+      delete w.__pin;
+      delete w.__kick;
+      delete w.__place;
+      delete w.__at;
+      delete w.__near;
+      delete w.__ghost;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1038,7 +1067,7 @@ function Pinball({
 
     // Sweep each flipper toward its target at a fixed rate, so the bat has a real
     // speed instead of snapping through the ball.
-    const swing = 16 * delta;
+    const swing = FLIP_SPEED * delta;
     const f = flip.current;
     const step = (current: number, target: number) => {
       if (Math.abs(target - current) <= swing) return target;
@@ -1176,19 +1205,55 @@ function Pinball({
         slingCooldown.current[side] = now + 260;
 
         const inward = side > 0 ? -1 : 1;
-        const speed = 3.4 + Math.random() * 1.4;
-        const spread = (Math.random() - 0.5) * (Math.PI * 0.72);
-        const vz = Math.cos(spread) * inward * speed;
-        const vx = Math.sin(spread) * speed - 1.1;
+        const incoming = Math.hypot(ball.linvel().x, ball.linvel().z);
+
+        // Bounce off the face the ball actually hit, then add the boost on top. The
+        // spread keeps it unpredictable, as on a real slingshot.
+        const awayX = t.x - plate.x;
+        const awayZ = t.z - plate.z;
+        const awayLen = Math.hypot(awayX, awayZ) || 1;
+        const base = Math.atan2(awayZ / awayLen, awayX / awayLen);
+        const spread = (Math.random() - 0.5) * (Math.PI * 0.5);
+        const angle = base + spread;
+
+        const boost = Math.min(
+          MAX_SPEED,
+          Math.max(4.6, incoming * 1.45 + 1.6),
+        );
+        const vx = Math.cos(angle) * boost;
+        const vz = Math.sin(angle) * boost;
 
         shared.score += 25;
         shared.onScore?.(shared.score);
+        shared.slingFlash[side] = now;
 
         ball.setTranslation(
           { x: t.x, y: PLAY.y + 0.025, z: plate.z + inward * 0.06 },
           true,
         );
         ball.setLinvel({ x: vx, y: 0.15, z: vz }, true);
+      }
+    }
+
+    // Keep the ball inside the range a real table can reach, and never let it come to
+    // a permanent stop on the playfield: a dead ball is a soft lock, not a skill shot.
+    if (mode.current === "play") {
+      const v = ball.linvel();
+      const speed = Math.hypot(v.x, v.z);
+      if (speed > MAX_SPEED) {
+        const k = MAX_SPEED / speed;
+        ball.setLinvel({ x: v.x * k, y: v.y, z: v.z * k }, true);
+      } else if (speed < 0.08) {
+        stalled.current += 1;
+        if (stalled.current > 45) {
+          stalled.current = 0;
+          ball.setLinvel(
+            { x: -0.9 - Math.random() * 0.5, y: 0.1, z: (Math.random() - 0.5) * 1.2 },
+            true,
+          );
+        }
+      } else {
+        stalled.current = 0;
       }
     }
 
