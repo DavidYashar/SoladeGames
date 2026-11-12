@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { RoundedBox } from "@react-three/drei";
+import { RoundedBox, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
@@ -100,6 +100,60 @@ const DOWNHILL = 1.5;
 
 const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
 
+const PART_METAL = new THREE.MeshStandardMaterial({
+  color: "#252a31",
+  roughness: 0.32,
+  metalness: 0.85,
+});
+const PART_STEEL = new THREE.MeshStandardMaterial({
+  color: "#c3c9d1",
+  roughness: 0.22,
+  metalness: 0.95,
+});
+const PART_RUBBER = new THREE.MeshStandardMaterial({
+  color: "#14171b",
+  roughness: 0.62,
+  metalness: 0.1,
+});
+
+/** One Blender part, with the named meshes given the materials we want. */
+function GltfPart({
+  url,
+  mapping,
+  position,
+  rotation,
+  scale,
+}: {
+  url: string;
+  mapping: Record<string, THREE.Material>;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: number;
+}) {
+  const { scene } = useGLTF(url);
+  const object = useMemo(() => {
+    const root = scene.clone(true);
+    root.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const key = Object.keys(mapping).find((name) => mesh.name.includes(name));
+      if (key) mesh.material = mapping[key];
+    });
+    return root;
+  }, [scene, mapping]);
+
+  return (
+    <primitive
+      object={object}
+      position={position}
+      rotation={rotation}
+      scale={scale ?? 1}
+    />
+  );
+}
+
 const shared = {
   ball: null as RAPIER.RigidBody | null,
   /** Bumper index -> time it was last struck, for the light. */
@@ -173,42 +227,44 @@ function Bumper({
   z: number;
   color?: string;
 }) {
-  const cap = useRef<THREE.MeshStandardMaterial>(null);
+  const { scene } = useGLTF("/models/pinball/bumper.glb");
+  const cap = useRef<THREE.MeshStandardMaterial | null>(null);
+
+  const object = useMemo(() => {
+    const capMaterial = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 1.5,
+      roughness: 0.22,
+      metalness: 0.25,
+    });
+    cap.current = capMaterial;
+
+    const root = scene.clone(true);
+    root.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      const lit =
+        mesh.name.includes("Cap") ||
+        mesh.name.includes("Crown") ||
+        mesh.name.includes("Core");
+      mesh.material = lit ? capMaterial : PART_METAL;
+    });
+    return root;
+  }, [scene, color]);
 
   useFrame(() => {
-    // Flash, then fade back down over about a third of a second.
+    const material = cap.current;
+    if (!material) return;
     const struck = shared.flash[id] ?? 0;
     const since = (performance.now() - struck) / 1000;
     const level = since < 0.35 ? 1 - since / 0.35 : 0;
-    if (cap.current) {
-      cap.current.emissiveIntensity = 1.5 + level * 6;
-      cap.current.color.setHex(0xffffff);
-      cap.current.color.lerp(new THREE.Color(color), 1 - level * 0.7);
-    }
+    material.emissiveIntensity = 1.5 + level * 6;
   });
 
-  return (
-    <group position={[x, PLAY.y, z]}>
-      <mesh position={[0, 0.016, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.028, 0.032, 0.032, 28]} />
-        <meshStandardMaterial color="#20242b" roughness={0.35} metalness={0.7} />
-      </mesh>
-      <mesh position={[0, 0.035, 0]} castShadow>
-        <cylinderGeometry args={[0.03, 0.028, 0.008, 28]} />
-        <meshStandardMaterial
-          ref={cap}
-          color={color}
-          emissive={color}
-          emissiveIntensity={1.5}
-          roughness={0.25}
-        />
-      </mesh>
-      <mesh position={[0, 0.041, 0]}>
-        <sphereGeometry args={[0.017, 18, 14]} />
-        <meshStandardMaterial color="#0c0e12" roughness={0.3} metalness={0.6} />
-      </mesh>
-    </group>
-  );
+  return <primitive object={object} position={[x, PLAY.y, z]} />;
 }
 
 /** Slingshot: a triangular bank with a live rubber face, as in the objects sheet. */
@@ -246,48 +302,24 @@ function Slingshot({ side }: { side: 1 | -1 }) {
  * edge and a machined hub. Built along +x so a single rotation aims it.
  */
 function FlipperMesh({ side }: { side: 1 | -1 }) {
-  const shape = useMemo(() => {
-    const s = new THREE.Shape();
-    s.moveTo(0.012, -FLIPPER.width / 2);
-    s.lineTo(FLIPPER.len, -0.009);
-    s.quadraticCurveTo(FLIPPER.len + 0.012, 0, FLIPPER.len, 0.009);
-    s.lineTo(0.012, FLIPPER.width / 2);
-    s.quadraticCurveTo(-0.004, 0, 0.012, -FLIPPER.width / 2);
-    return s;
-  }, []);
+  const mapping = useMemo(
+    () => ({
+      Rubber: PART_RUBBER,
+      Bat: PART_STEEL,
+      Hub: PART_STEEL,
+      HubRing: PART_METAL,
+    }),
+    [],
+  );
 
   return (
-    <group rotation={[Math.PI / 2, 0, 0]}>
-      <mesh castShadow receiveShadow>
-        <extrudeGeometry
-          args={[
-            shape,
-            {
-              depth: FLIPPER.thick,
-              bevelEnabled: true,
-              bevelSize: 0.002,
-              bevelThickness: 0.002,
-              bevelSegments: 2,
-            },
-          ]}
-        />
-        <meshStandardMaterial color="#1b1e23" roughness={0.45} metalness={0.3} />
-      </mesh>
-      {/* Polished top face */}
-      <mesh position={[0, 0, -0.0015]}>
-        <extrudeGeometry args={[shape, { depth: 0.002, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#e8ebef" roughness={0.22} metalness={0.85} />
-      </mesh>
-      {/* Hub */}
-      <mesh position={[0, 0, -FLIPPER.thick / 2]} castShadow>
-        <cylinderGeometry args={[0.017, 0.017, FLIPPER.thick + 0.008, 20]} />
-        <meshStandardMaterial color="#9aa1a9" roughness={0.25} metalness={0.95} />
-      </mesh>
-      <mesh position={[FLIPPER.len - 0.03, 0, -0.0035]}>
+    <>
+      <GltfPart url="/models/pinball/flipper.glb" mapping={mapping} />
+      <mesh position={[FLIPPER.len - 0.03, 0, 0.011]}>
         <boxGeometry args={[0.008, 0.004, 0.001]} />
         <meshBasicMaterial color={side > 0 ? NEON : NEON_VIOLET} toneMapped={false} />
       </mesh>
-    </group>
+    </>
   );
 }
 
@@ -296,7 +328,6 @@ function PlungerSpring() {
   const spring = useRef<THREE.Group>(null);
 
   useFrame(() => {
-    // Draw the spring back as the player charges, so the pull is visible.
     if (!spring.current) return;
     spring.current.position.x = 0.472 + shared.charge * 0.02;
     spring.current.scale.x = 1 - shared.charge * 0.32;
@@ -407,18 +438,11 @@ function Spinner({ x, z }: { x: number; z: number }) {
 }
 
 /** Kicker and post blockers, from the objects sheet. */
+const POST_MAP = { Shaft: PART_METAL, Head: PART_STEEL };
+
 function Post({ x, z }: { x: number; z: number }) {
   return (
-    <group position={[x, PLAY.y, z]}>
-      <mesh position={[0, 0.014, 0]} castShadow>
-        <cylinderGeometry args={[0.008, 0.01, 0.028, 14]} />
-        <meshStandardMaterial color="#7d838c" roughness={0.35} metalness={0.85} />
-      </mesh>
-      <mesh position={[0, 0.03, 0]} castShadow>
-        <sphereGeometry args={[0.008, 12, 10]} />
-        <meshStandardMaterial color="#c9ced6" roughness={0.3} metalness={0.9} />
-      </mesh>
-    </group>
+    <GltfPart url="/models/pinball/post.glb" mapping={POST_MAP} position={[x, PLAY.y, z]} />
   );
 }
 
@@ -435,6 +459,27 @@ function Pinball({
 }) {
   const { camera, gl } = useThree();
   const ballMesh = useRef<THREE.Mesh>(null);
+  const ballRoot = useRef<THREE.Group>(null);
+  const { scene: ballScene } = useGLTF("/models/pinball/ball.glb");
+  const ballModel = useMemo(() => {
+    const material = new THREE.MeshPhysicalMaterial({
+      color: "#d8dde4",
+      roughness: 0.1,
+      metalness: 0.95,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.05,
+      envMapIntensity: 1.1,
+    });
+    const root = ballScene.clone(true);
+    root.traverse((child) => {
+      const m = child as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.material = material;
+      m.castShadow = true;
+      m.receiveShadow = true;
+    });
+    return root;
+  }, [ballScene]);
   const leftFlip = useRef<THREE.Group>(null);
   const rightFlip = useRef<THREE.Group>(null);
   const leftBody = useRef<RAPIER.RigidBody | null>(null);
@@ -911,9 +956,9 @@ function Pinball({
 
     const t = ball.translation();
     const r = ball.rotation();
-    if (ballMesh.current) {
-      ballMesh.current.position.set(t.x, t.y, t.z);
-      ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
+    if (ballRoot.current) {
+      ballRoot.current.position.set(t.x, t.y, t.z);
+      ballRoot.current.quaternion.set(r.x, r.y, r.z, r.w);
     }
 
     // Lane exit. The shooter lane ends in a gate on a real table; here the ball is
@@ -964,10 +1009,9 @@ function Pinball({
 
   return (
     <>
-      <mesh ref={ballMesh} position={[0, PLAY.y + BALL_R, 0]} castShadow>
-        <sphereGeometry args={[BALL_R, 64, 48]} />
-        <meshStandardMaterial color="#d8dde4" roughness={0.12} metalness={0.95} />
-      </mesh>
+      <group ref={ballRoot} position={[0, PLAY.y + BALL_R, 0]}>
+        <primitive object={ballModel} />
+      </group>
 
       <group ref={leftFlip} position={[0.34, PLAY.y + 0.02, M(0.112)]}>
         <FlipperMesh side={1} />
@@ -1162,6 +1206,10 @@ function Cabinet() {
     </group>
   );
 }
+
+useGLTF.preload("/models/pinball/bumper.glb");
+useGLTF.preload("/models/pinball/flipper.glb");
+useGLTF.preload("/models/pinball/post.glb");
 
 export function PinballTable() {
   const [score, setScore] = useState(0);
