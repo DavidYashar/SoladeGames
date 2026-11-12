@@ -40,14 +40,10 @@ const DIVIDER_FROM = HALF_L - 0.1;
 const DIVIDER_TO = -0.22;
 
 /** The corridor exit, drawn and collided from the same points. */
-const CIRCUIT: [number, number][] = Array.from(
-  { length: 9 },
-  (_, i): [number, number] => {
-    // Quarter turn from the lane's outer wall round into the playfield.
-    const a = Math.PI * 1.5 - (i / 8) * (Math.PI / 2);
-    return [-0.22 + 0.218 * Math.cos(a), -0.04 + 0.218 * Math.sin(a)];
-  },
-);
+const CIRCUIT: [number, number][] = [
+  [-0.3, -HALF_W + 0.012],
+  [-0.368, -0.2],
+];
 
 const RAIL = 0.05;
 const RAIL_H = 0.055;
@@ -431,10 +427,10 @@ function Pinball({
       box(0.012, HALF_W, HALF_L, 0, 0.5); // near wall, behind the plunger
 
       // The lane's outer wall stops where the exit curve begins.
-      box((HALF_L + 0.22) / 2, 0.012, (HALF_L - 0.22) / 2, -HALF_W, 0.5);
+      box((HALF_L + 0.3) / 2, 0.012, (HALF_L - 0.3) / 2, -HALF_W, 0.5);
 
       // The far wall is only behind the field; the lane exits through the curve.
-      box(0.012, (HALF_W + 0.04) / 2, -HALF_L, (HALF_W - 0.04) / 2, 0.5);
+      box(0.012, HALF_W, -HALF_L, 0, 0.5);
 
       // Corridor divider: the ball shoots up the right lane and leaves at the top.
       box((DIVIDER_FROM - DIVIDER_TO) / 2, 0.008, (DIVIDER_FROM + DIVIDER_TO) / 2, DIVIDER_Z, 0.3);
@@ -451,8 +447,8 @@ function Pinball({
           RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.008)
             .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
             .setRotation(quatFromY(Math.atan2(-dz, dx)))
-            .setFriction(0.1)
-            .setRestitution(0.5),
+            .setFriction(0.02)
+            .setRestitution(0.88),
         );
       }
 
@@ -791,24 +787,6 @@ function Pinball({
     if (ballMesh.current) {
       ballMesh.current.position.set(t.x, t.y, t.z);
       ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
-    }
-
-    // Inside the exit curve the wall is bending, so the ball follows it round. The
-    // segmented collider reflects a fast ball instead of carrying it; this is the
-    // centripetal part of the same interaction, applied where the curve is.
-    if (mode.current === "play") {
-      const here = ball.translation();
-      if (here.x < -0.2 && here.z < -0.12) {
-        const dx = -0.22 - here.x;
-        const dz = -0.04 - here.z;
-        const len = Math.hypot(dx, dz) || 1;
-        const v = ball.linvel();
-        const pull = 11 * delta;
-        ball.setLinvel(
-          { x: v.x + (dx / len) * pull, y: v.y, z: v.z + (dz / len) * pull },
-          true,
-        );
-      }
     }
 
     // The ball has rolled back down the lane onto the plunger: re-arm it so the
