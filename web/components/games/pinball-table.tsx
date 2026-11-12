@@ -104,16 +104,14 @@ const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
 const FLIP_SPEED = 26;
 
 const PART_WALL = new THREE.MeshStandardMaterial({
-  color: "#0a0c10",
-  roughness: 0.1,
-  metalness: 0.92,
+  color: "#07080b",
+  roughness: 0.22,
+  metalness: 0.55,
 });
 const PART_WALL_EDGE = new THREE.MeshStandardMaterial({
-  color: "#191d24",
-  roughness: 0.18,
-  metalness: 0.88,
-  emissive: new THREE.Color("#4fc8ff"),
-  emissiveIntensity: 0.55,
+  color: "#14171c",
+  roughness: 0.3,
+  metalness: 0.5,
 });
 const PART_METAL = new THREE.MeshStandardMaterial({
   color: "#252a31",
@@ -1410,22 +1408,6 @@ function Cabinet() {
       <LaneWall side={1} />
       <LaneWall side={-1} />
 
-      {/* Light riding the walls, spilling onto the playfield. */}
-      <pointLight
-        position={[-0.31, PLAY.y + 0.05, M(0)]}
-        color="#7fd8ff"
-        intensity={0.9}
-        distance={0.45}
-        decay={2}
-      />
-      <pointLight
-        position={[(DIVIDER_FROM + DIVIDER_TO) / 2, PLAY.y + 0.05, DIVIDER_Z]}
-        color="#7fd8ff"
-        intensity={0.7}
-        distance={0.4}
-        decay={2}
-      />
-
       <TableWalls />
 
       {/* Top arch with a saucer behind it. */}
@@ -1511,6 +1493,16 @@ export function PinballTable() {
           color="#fff2dc"
           castShadow={false}
           target-position={[0, PLAY.y, 0]}
+        />
+        <spotLight
+          position={[-0.25, 1.6, 0]}
+          angle={0.85}
+          penumbra={0.9}
+          intensity={7}
+          distance={3}
+          decay={2}
+          color="#fff2dc"
+          target-position={[-0.3, PLAY.y, M(0)]}
         />
         <directionalLight position={[1.2, 2.4, 1.2]} intensity={0.8} color="#ffe9c8" castShadow />
 
