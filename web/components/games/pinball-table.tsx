@@ -1,39 +1,80 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
 
 import { makeWoodTextures } from "@/lib/jenga/wood";
 
 /**
- * Neon Pinball, table only.
+ * Neon Pinball.
  *
- * Real scale: the playfield of a standard cabinet is about 0.52 m by 1.09 m and sits
- * roughly 0.85 m off the floor. The camera stands at the player's end at the same
- * 50 degrees we use on the billiard table, so the two cabinets read as one room.
+ * Real scale: playfield 0.54 m by 1.08 m, bed 0.85 m off the floor. The table is
+ * rendered flat, so the slope a real table has is applied as a constant downhill pull
+ * toward the player instead of a tilted floor.
  *
- * No physics yet. This is the table, the furniture on it, and the cabinet around it.
+ * The plunger corridor runs the full right-hand side. Hold Space to draw the spring,
+ * release to fire; the harder you pull, the faster the ball leaves.
  */
 
 const PLAY = { w: 0.54, l: 1.08, y: 0.85 };
+const HALF_W = PLAY.w / 2;
+const HALF_L = PLAY.l / 2;
+
+const CORRIDOR_Z = -HALF_W + 0.026;
+const DIVIDER_Z = -HALF_W + 0.058;
+const DIVIDER_FROM = HALF_L - 0.1;
+const DIVIDER_TO = -0.3;
+
+/** The corridor exit, drawn and collided from the same points. */
+const CIRCUIT: [number, number][] = [
+  [-0.34, -HALF_W + 0.004],
+  [-0.42, -0.232],
+  [-0.458, -0.16],
+  [-0.468, -0.075],
+];
+
 const RAIL = 0.05;
 const RAIL_H = 0.055;
-const FLOOR_Y = 0;
 
 const SLATE = "#1d222a";
-const SLATE_LINE = "#2a2f37";
 const NEON = "#22e0ff";
 const NEON_VIOLET = "#a06bff";
+const AMBER = "#ffd166";
 
 const BALL_R = 0.0135;
+const DOWNHILL = 1.5;
+
+const FLIPPER = { len: 0.112, thick: 0.014, width: 0.03 };
+
+const shared = {
+  ball: null as RAPIER.RigidBody | null,
+  charge: 0,
+  plungerHeld: false,
+  score: 0,
+  onScore: null as ((v: number) => void) | null,
+};
+
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ------------------------------------------------------------------ table pieces
 
 function Slate() {
   const lines = useMemo(() => {
     const out: number[] = [];
-    for (let z = -PLAY.w / 2 + 0.09; z < PLAY.w / 2; z += 0.09) out.push(z);
+    for (let z = -HALF_W + 0.07; z < HALF_W; z += 0.07) out.push(z);
     return out;
   }, []);
 
@@ -44,19 +85,17 @@ function Slate() {
         <meshStandardMaterial color={SLATE} roughness={0.42} metalness={0.25} />
       </mesh>
 
-      {/* Faint playfield guides, to give the surface scale. */}
       {lines.map((z) => (
         <mesh key={z} position={[0, PLAY.y + 0.0085, z]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[PLAY.l - 0.04, 0.0012]} />
-          <meshBasicMaterial color={SLATE_LINE} transparent opacity={0.5} toneMapped={false} />
+          <meshBasicMaterial color="#2a2f37" transparent opacity={0.45} toneMapped={false} />
         </mesh>
       ))}
 
-      {/* Neon edge strips down both sides. */}
       {[-1, 1].map((side) => (
         <mesh
           key={side}
-          position={[0, PLAY.y + 0.009, (side * PLAY.w) / 2 - side * 0.012]}
+          position={[0, PLAY.y + 0.009, side * (HALF_W - 0.012)]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
           <planeGeometry args={[PLAY.l - 0.12, 0.004]} />
@@ -67,46 +106,54 @@ function Slate() {
   );
 }
 
-/** Pop bumper: a drum with a cap, the classic round target. */
+/** Pop bumper: drum, neon cap, and a skirt in the colour of the reference objects. */
 function Bumper({ x, z, color = NEON }: { x: number; z: number; color?: string }) {
   return (
     <group position={[x, PLAY.y, z]}>
-      <mesh position={[0, 0.018, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.026, 0.03, 0.036, 24]} />
+      <mesh position={[0, 0.016, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.028, 0.032, 0.032, 28]} />
         <meshStandardMaterial color="#20242b" roughness={0.35} metalness={0.7} />
       </mesh>
-      <mesh position={[0, 0.038, 0]} castShadow>
-        <cylinderGeometry args={[0.026, 0.026, 0.006, 24]} />
+      <mesh position={[0, 0.035, 0]} castShadow>
+        <cylinderGeometry args={[0.03, 0.028, 0.008, 28]} />
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={1.8}
+          emissiveIntensity={1.5}
           roughness={0.25}
         />
       </mesh>
-      <mesh position={[0, 0.043, 0]}>
-        <sphereGeometry args={[0.014, 16, 12]} />
+      <mesh position={[0, 0.041, 0]}>
+        <sphereGeometry args={[0.017, 18, 14]} />
         <meshStandardMaterial color="#0c0e12" roughness={0.3} metalness={0.6} />
       </mesh>
     </group>
   );
 }
 
-/** Slingshot: the angled kicker beside each flipper. */
+/** Slingshot: a triangular bank with a live rubber face, as in the objects sheet. */
 function Slingshot({ side }: { side: 1 | -1 }) {
-  const z = side * 0.145;
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(0, 0);
+    s.lineTo(0.11, 0.012);
+    s.lineTo(0.02, 0.05);
+    s.closePath();
+    return s;
+  }, []);
+
   return (
-    <group position={[0.12, PLAY.y, z]} rotation={[0, side * -0.42, 0]}>
-      <mesh position={[0, 0.014, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.13, 0.026, 0.022]} />
+    <group position={[0.14, PLAY.y + 0.022, side * 0.15]} rotation={[Math.PI / 2, 0, side * -0.5]}>
+      <mesh castShadow receiveShadow>
+        <extrudeGeometry args={[shape, { depth: 0.022, bevelEnabled: false }]} />
         <meshStandardMaterial color="#23272e" roughness={0.4} metalness={0.55} />
       </mesh>
-      <mesh position={[0, 0.028, side * 0.004]} rotation={[0, 0, 0]}>
-        <boxGeometry args={[0.12, 0.004, 0.012]} />
+      <mesh position={[0.03, 0.004, 0.023]}>
+        <boxGeometry args={[0.07, 0.008, 0.006]} />
         <meshStandardMaterial
           color={NEON_VIOLET}
           emissive={NEON_VIOLET}
-          emissiveIntensity={1.6}
+          emissiveIntensity={1.8}
           roughness={0.3}
         />
       </mesh>
@@ -114,50 +161,105 @@ function Slingshot({ side }: { side: 1 | -1 }) {
   );
 }
 
-/** Flipper: a tapered bat on a post, angled down toward the drain. */
-function Flipper({ side }: { side: 1 | -1 }) {
-  const pivotZ = side * 0.105;
+/**
+ * Flipper: the long tapered bat from the sample, with a dark rubber band around the
+ * edge and a machined hub. Built along +x so a single rotation aims it.
+ */
+function FlipperMesh({ side }: { side: 1 | -1 }) {
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(0.012, -FLIPPER.width / 2);
+    s.lineTo(FLIPPER.len, -0.009);
+    s.quadraticCurveTo(FLIPPER.len + 0.012, 0, FLIPPER.len, 0.009);
+    s.lineTo(0.012, FLIPPER.width / 2);
+    s.quadraticCurveTo(-0.004, 0, 0.012, -FLIPPER.width / 2);
+    return s;
+  }, []);
+
   return (
-    <group position={[0.36, PLAY.y, pivotZ]} rotation={[0, -side * 0.5, 0]}>
-      {/* Pivot post */}
-      <mesh position={[0, 0.014, 0]} castShadow>
-        <cylinderGeometry args={[0.012, 0.012, 0.028, 16]} />
-        <meshStandardMaterial color="#2b3038" roughness={0.35} metalness={0.8} />
-      </mesh>
-      {/* Bat */}
-      <mesh position={[-0.055, 0.012, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.115, 0.016, 0.026]} />
-        <meshStandardMaterial color="#c9ced6" roughness={0.25} metalness={0.9} />
-      </mesh>
-      {/* Rubber edge, the part that actually hits */}
-      <mesh position={[-0.055, 0.019, 0]}>
-        <boxGeometry args={[0.112, 0.006, 0.03]} />
-        <meshStandardMaterial
-          color={NEON}
-          emissive={NEON}
-          emissiveIntensity={1.1}
-          roughness={0.45}
+    <group rotation={[Math.PI / 2, 0, 0]}>
+      <mesh castShadow receiveShadow>
+        <extrudeGeometry
+          args={[
+            shape,
+            {
+              depth: FLIPPER.thick,
+              bevelEnabled: true,
+              bevelSize: 0.002,
+              bevelThickness: 0.002,
+              bevelSegments: 2,
+            },
+          ]}
         />
+        <meshStandardMaterial color="#1b1e23" roughness={0.45} metalness={0.3} />
+      </mesh>
+      {/* Polished top face */}
+      <mesh position={[0, 0, -0.0015]}>
+        <extrudeGeometry args={[shape, { depth: 0.002, bevelEnabled: false }]} />
+        <meshStandardMaterial color="#e8ebef" roughness={0.22} metalness={0.85} />
+      </mesh>
+      {/* Hub */}
+      <mesh position={[0, 0, -FLIPPER.thick / 2]} castShadow>
+        <cylinderGeometry args={[0.017, 0.017, FLIPPER.thick + 0.008, 20]} />
+        <meshStandardMaterial color="#9aa1a9" roughness={0.25} metalness={0.95} />
+      </mesh>
+      <mesh position={[FLIPPER.len - 0.03, 0, -0.0035]}>
+        <boxGeometry args={[0.008, 0.004, 0.001]} />
+        <meshBasicMaterial color={side > 0 ? NEON : NEON_VIOLET} toneMapped={false} />
       </mesh>
     </group>
   );
 }
 
-/** A drop-target bank: five plates that stand up from the playfield. */
+/** Drop target bank. */
 function DropTargets({ x }: { x: number }) {
   return (
     <group position={[x, PLAY.y, 0]}>
-      {[-0.05, -0.025, 0, 0.025, 0.05].map((z) => (
+      {[-0.06, -0.03, 0, 0.03, 0.06].map((z) => (
         <group key={z} position={[0, 0, z]}>
           <mesh position={[0, 0.014, 0]} castShadow receiveShadow>
-            <boxGeometry args={[0.008, 0.028, 0.019]} />
+            <boxGeometry args={[0.01, 0.028, 0.022]} />
             <meshStandardMaterial color="#39404a" roughness={0.35} metalness={0.7} />
           </mesh>
-          <mesh position={[0.005, 0.022, 0]}>
-            <boxGeometry args={[0.002, 0.008, 0.015]} />
+          <mesh position={[0.006, 0.027, 0]}>
+            <boxGeometry args={[0.002, 0.006, 0.018]} />
             <meshStandardMaterial
-              color="#ffd166"
-              emissive="#ffd166"
+              color={AMBER}
+              emissive={AMBER}
+              emissiveIntensity={1.4}
+              roughness={0.4}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** The rollover ring: a circle of posts, exactly as in the layout sheet. */
+function RolloverRing() {
+  const ring = useMemo(() => {
+    const out: [number, number][] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const a = (i / 12) * Math.PI * 2;
+      out.push([Math.cos(a) * 0.15 - 0.02, Math.sin(a) * 0.11]);
+    }
+    return out;
+  }, []);
+
+  return (
+    <group>
+      {ring.map(([x, z]) => (
+        <group key={`${x}${z}`} position={[x, PLAY.y, z]}>
+          <mesh position={[0, 0.012, 0]} castShadow>
+            <cylinderGeometry args={[0.006, 0.006, 0.024, 12]} />
+            <meshStandardMaterial color="#c9ced6" roughness={0.3} metalness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.025, 0]}>
+            <sphereGeometry args={[0.005, 10, 8]} />
+            <meshStandardMaterial
+              color={AMBER}
+              emissive={AMBER}
               emissiveIntensity={1.2}
               roughness={0.4}
             />
@@ -168,78 +270,387 @@ function DropTargets({ x }: { x: number }) {
   );
 }
 
-/** Small posts, arranged in the ring from the reference. */
-function Posts() {
-  const ring = useMemo(() => {
-    const out: [number, number][] = [];
-    for (let i = 0; i < 10; i += 1) {
-      const a = (i / 10) * Math.PI * 2;
-      out.push([Math.cos(a) * 0.13 - 0.02, Math.sin(a) * 0.1]);
-    }
-    return out;
+/** Spinner: a flat plate on a gate, from the objects sheet. */
+function Spinner({ x, z }: { x: number; z: number }) {
+  const plate = useRef<THREE.Mesh>(null);
+  useFrame((_, delta) => {
+    if (plate.current) plate.current.rotation.z += delta * 1.2;
+  });
+
+  return (
+    <group position={[x, PLAY.y, z]}>
+      <mesh position={[0, 0.02, -0.03]} castShadow>
+        <boxGeometry args={[0.006, 0.03, 0.006]} />
+        <meshStandardMaterial color="#8a9099" roughness={0.3} metalness={0.9} />
+      </mesh>
+      <mesh ref={plate} position={[0, 0.02, -0.03]} castShadow>
+        <boxGeometry args={[0.001, 0.04, 0.036]} />
+        <meshStandardMaterial color="#2f6f8a" emissive={NEON} emissiveIntensity={0.5} roughness={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Kicker and post blockers, from the objects sheet. */
+function Post({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, PLAY.y, z]}>
+      <mesh position={[0, 0.014, 0]} castShadow>
+        <cylinderGeometry args={[0.008, 0.01, 0.028, 14]} />
+        <meshStandardMaterial color="#7d838c" roughness={0.35} metalness={0.85} />
+      </mesh>
+      <mesh position={[0, 0.03, 0]} castShadow>
+        <sphereGeometry args={[0.008, 12, 10]} />
+        <meshStandardMaterial color="#c9ced6" roughness={0.3} metalness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+// ------------------------------------------------------------------ physics + ball
+
+function Pinball({
+  onScore,
+  onCharge,
+}: {
+  onScore: (v: number) => void;
+  onCharge: (v: number) => void;
+}) {
+  const { camera, gl } = useThree();
+  const ballMesh = useRef<THREE.Mesh>(null);
+  const leftFlip = useRef<THREE.Group>(null);
+  const rightFlip = useRef<THREE.Group>(null);
+  const leftBody = useRef<RAPIER.RigidBody | null>(null);
+  const rightBody = useRef<RAPIER.RigidBody | null>(null);
+  const world = useRef<RAPIER.World | null>(null);
+  const acc = useRef(0);
+  const events = useRef<RAPIER.EventQueue | null>(null);
+  const scoring = useRef<Record<number, number>>({});
+  const [ready, setReady] = useState(false);
+  const cleanups = useRef<(() => void)[]>([]);
+
+  const FLIP_REST = 0.42;
+  const FLIP_PRESS = -0.5;
+  const FLIP_SPEED = 9;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      await RAPIER.init();
+      if (cancelled) return;
+
+      // The table is flat on screen; the slope is this constant pull toward the player.
+      const w = new RAPIER.World({ x: DOWNHILL, y: -9.81, z: 0 });
+      w.timestep = 1 / 240;
+
+      // Playfield floor.
+      w.createCollider(
+        RAPIER.ColliderDesc.cuboid(HALF_L, 0.008, HALF_W)
+          .setTranslation(0, PLAY.y, 0)
+          .setFriction(0.08)
+          .setRestitution(0.18),
+      );
+
+      const box = (
+        hx: number,
+        hz: number,
+        x: number,
+        z: number,
+        restitution = 0.45,
+        score = 0,
+      ) => {
+        const collider = w.createCollider(
+          RAPIER.ColliderDesc.cuboid(hx, 0.03, hz)
+            .setTranslation(x, PLAY.y + 0.02, z)
+            .setFriction(0.12)
+            .setRestitution(restitution),
+        );
+        if (score) scoring.current[collider.handle] = score;
+        return collider;
+      };
+
+      // Outer walls.
+      box(HALF_L, 0.012, 0, HALF_W, 0.5);
+      box(HALF_L, 0.012, 0, -HALF_W, 0.5);
+      box(0.012, HALF_W, HALF_L, 0, 0.5);
+      box(0.012, HALF_W, -HALF_L, 0, 0.5);
+
+      // Corridor divider: the ball shoots up the right lane and leaves at the top.
+      box((DIVIDER_FROM - DIVIDER_TO) / 2, 0.008, (DIVIDER_FROM + DIVIDER_TO) / 2, DIVIDER_Z, 0.3);
+
+      // The corridor exit: a short arc that carries the ball out of the lane and into
+      // the playfield, instead of letting it fall straight back down.
+      for (let i = 0; i < CIRCUIT.length - 1; i += 1) {
+        const [x0, z0] = CIRCUIT[i];
+        const [x1, z1] = CIRCUIT[i + 1];
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        const len = Math.hypot(dx, dz);
+        w.createCollider(
+          RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.008)
+            .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
+            .setRotation(quatFromY(Math.atan2(-dz, dx)))
+            .setFriction(0.1)
+            .setRestitution(0.5),
+        );
+      }
+
+      // Bumpers: three large, as in the layout, plus the top one.
+      const bumperAt = (x: number, z: number) => {
+        const c = w.createCollider(
+          RAPIER.ColliderDesc.cylinder(0.03, 0.03)
+            .setTranslation(x, PLAY.y + 0.03, z)
+            .setFriction(0.05)
+            .setRestitution(1.25),
+        );
+        scoring.current[c.handle] = 100;
+      };
+      bumperAt(-0.13, -0.085);
+      bumperAt(-0.13, 0.085);
+      bumperAt(-0.26, 0);
+      bumperAt(-0.4, -0.13);
+
+      // Slingshots.
+      const sling = (side: 1 | -1) => {
+        const c = w.createCollider(
+          RAPIER.ColliderDesc.cuboid(0.06, 0.03, 0.012)
+            .setTranslation(0.16, PLAY.y + 0.03, side * 0.14)
+            .setRotation(quatFromY(side * -0.5))
+            .setFriction(0.05)
+            .setRestitution(1.2),
+        );
+        scoring.current[c.handle] = 25;
+      };
+      sling(1);
+      sling(-1);
+
+      // Drop targets.
+      for (let i = 0; i < 5; i += 1) {
+        const c = box(0.008, 0.012, -0.4, -0.06 + i * 0.03, 0.7);
+        scoring.current[c.handle] = 50;
+      }
+
+      // Posts.
+      const ring = (cx: number, cz: number, r: number, count: number) => {
+        for (let i = 0; i < count; i += 1) {
+          const a = (i / count) * Math.PI * 2;
+          const c = w.createCollider(
+            RAPIER.ColliderDesc.cylinder(0.02, 0.007)
+              .setTranslation(cx + Math.cos(a) * r, PLAY.y + 0.02, cz + Math.sin(a) * r)
+              .setRestitution(0.7),
+          );
+          scoring.current[c.handle] = 10;
+        }
+      };
+      ring(-0.02, 0, 0.13, 12);
+      // Outlane posts.
+      box(0.008, 0.008, 0.3, 0.2, 0.6);
+      box(0.008, 0.008, 0.3, -0.2, 0.6);
+
+      // Flippers: kinematic, so a rotation drags the ball rather than teleporting it.
+      const makeFlipper = (side: 1 | -1) => {
+        const body = w.createRigidBody(
+          RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
+            0.33,
+            PLAY.y + 0.02,
+            side * 0.085,
+          ),
+        );
+        w.createCollider(
+          RAPIER.ColliderDesc.cuboid(FLIPPER.len / 2, 0.012, FLIPPER.width / 2)
+            .setTranslation(FLIPPER.len / 2, 0, 0)
+            .setFriction(0.1)
+            .setRestitution(0.6),
+          body,
+        );
+        body.setRotation(quatFromY(side * FLIP_REST), true);
+        return body;
+      };
+      leftBody.current = makeFlipper(1);
+      rightBody.current = makeFlipper(-1);
+
+      // Ball: starts in the corridor, held until the plunger fires.
+      const ball = w.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(HALF_L - 0.06, PLAY.y + BALL_R + 0.02, CORRIDOR_Z)
+          .setLinearDamping(0.04)
+          .setAngularDamping(0.4)
+          .setCcdEnabled(true),
+      );
+      const ballCollider = w.createCollider(
+        RAPIER.ColliderDesc.ball(BALL_R)
+          .setDensity(7)
+          .setFriction(0.1)
+          .setRestitution(0.45)
+          .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+        ball,
+      );
+
+      if (cancelled) {
+        w.free();
+        return;
+      }
+
+      world.current = w;
+      events.current = new RAPIER.EventQueue(true);
+      shared.ball = ball;
+      (window as unknown as { __pin?: () => unknown }).__pin = () => {
+        const tr = ball.translation();
+        const v = ball.linvel();
+        return { x: tr.x, y: tr.y, z: tr.z, vx: v.x, vz: v.z, charge: shared.charge };
+      };
+      shared.onScore = onScore;
+      setReady(true);
+
+      // Keyboard: Space charges the plunger, arrows/A-D work the flippers.
+      const down = (e: KeyboardEvent) => {
+        if (e.code === "Space") {
+          e.preventDefault();
+          shared.plungerHeld = true;
+          return;
+        }
+        if (e.code === "ArrowLeft" || e.code === "KeyA") {
+          leftBody.current?.setNextKinematicRotation(quatFromY(FLIP_PRESS * 1.55), true);
+        }
+        if (e.code === "ArrowRight" || e.code === "KeyD") {
+          rightBody.current?.setNextKinematicRotation(quatFromY(FLIP_PRESS * 1.55), true);
+        }
+      };
+      const up = (e: KeyboardEvent) => {
+        if (e.code === "Space") {
+          shared.plungerHeld = false;
+          // Fire along the lane: charge 0..1 maps onto 1.5..5.6 m/s.
+          const speed = 1.5 + shared.charge * 4.1;
+          ball.setTranslation(
+            { x: HALF_L - 0.06, y: PLAY.y + BALL_R + 0.02, z: CORRIDOR_Z },
+            true,
+          );
+          ball.setLinvel({ x: -speed, y: 0, z: 0 }, true);
+          shared.charge = 0;
+          onCharge(0);
+          return;
+        }
+        if (e.code === "ArrowLeft" || e.code === "KeyA") {
+          leftBody.current?.setNextKinematicRotation(quatFromY(FLIP_REST), true);
+        }
+        if (e.code === "ArrowRight" || e.code === "KeyD") {
+          rightBody.current?.setNextKinematicRotation(quatFromY(-FLIP_REST), true);
+        }
+      };
+
+      window.addEventListener("keydown", down);
+      window.addEventListener("keyup", up);
+      cleanups.current.push(() => {
+        window.removeEventListener("keydown", down);
+        window.removeEventListener("keyup", up);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanups.current.forEach((fn) => fn());
+      cleanups.current = [];
+      world.current?.free();
+      world.current = null;
+      shared.ball = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <group>
-      {ring.map(([x, z]) => (
-        <mesh key={`${x}${z}`} position={[x, PLAY.y + 0.014, z]} castShadow>
-          <cylinderGeometry args={[0.005, 0.005, 0.028, 12]} />
-          <meshStandardMaterial color="#8a9099" roughness={0.3} metalness={0.9} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
 
-/** The plunger lane down the right side, with its spring and the shooter. */
-function Plunger() {
-  const laneZ = -(PLAY.w / 2 - 0.055);
+  const resetBall = useCallback(() => {
+    const ball = shared.ball;
+    if (!ball) return;
+    ball.setTranslation(
+      { x: HALF_L - 0.06, y: PLAY.y + BALL_R + 0.02, z: CORRIDOR_Z },
+      true,
+    );
+    ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    ball.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    shared.charge = 0;
+    onCharge(0);
+  }, [onCharge]);
+
+  useFrame((_, delta) => {
+    const w = world.current;
+    const ball = shared.ball;
+    if (!w || !ball) return;
+
+    if (shared.plungerHeld) {
+      shared.charge = Math.min(1, shared.charge + delta / 1.1);
+      onCharge(shared.charge);
+    }
+
+    // Keep the flippers where the scene should draw them.
+    if (leftFlip.current && leftBody.current) {
+      const r = leftBody.current.rotation();
+      leftFlip.current.quaternion.set(r.x, r.y, r.z, r.w);
+    }
+    if (rightFlip.current && rightBody.current) {
+      const r = rightBody.current.rotation();
+      rightFlip.current.quaternion.set(r.x, r.y, r.z, r.w);
+    }
+
+    acc.current += Math.min(delta, 0.05);
+    let steps = 0;
+    while (acc.current >= w.timestep && steps < 12) {
+      w.step(events.current ?? undefined);
+      acc.current -= w.timestep;
+      steps += 1;
+    }
+
+    const queue = events.current;
+    if (queue) {
+      queue.drainCollisionEvents((h1, h2, started) => {
+        if (!started) return;
+        const value = scoring.current[h1] ?? scoring.current[h2];
+        if (value) {
+          shared.score += value;
+          shared.onScore?.(shared.score);
+        }
+      });
+    }
+
+    const t = ball.translation();
+    const r = ball.rotation();
+    if (ballMesh.current) {
+      ballMesh.current.position.set(t.x, t.y, t.z);
+      ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
+    }
+
+    // Drained: past the flippers and in the field, or under the playfield.
+    if (t.y < PLAY.y - 0.08 || (t.x > 0.44 && t.z > DIVIDER_Z + 0.01)) resetBall();
+    // Stalled somewhere it should not be.
+    const v = ball.linvel();
+    if (Math.hypot(v.x, v.z) < 0.03 && t.x > 0.2 && !shared.plungerHeld) resetBall();
+  });
+
   return (
-    <group>
-      {/* Lane divider */}
-      <mesh position={[0.02, PLAY.y + 0.022, laneZ + 0.032]} castShadow receiveShadow>
-        <boxGeometry args={[0.5, 0.03, 0.01]} />
-        <meshStandardMaterial color="#2a2f37" roughness={0.35} metalness={0.6} />
+    <>
+      <mesh ref={ballMesh} position={[0, PLAY.y + BALL_R, 0]} castShadow>
+        <sphereGeometry args={[BALL_R, 64, 48]} />
+        <meshStandardMaterial color="#d8dde4" roughness={0.12} metalness={0.95} />
       </mesh>
 
-      {/* Spring */}
-      <group position={[0.44, PLAY.y, laneZ]}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <mesh key={i} position={[0.02 + i * 0.008, 0.012, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.011, 0.0022, 8, 16]} />
-            <meshStandardMaterial color="#b9c0c9" roughness={0.3} metalness={0.95} />
-          </mesh>
-        ))}
-        {/* Shooter rod */}
-        <mesh position={[0.005, 0.012, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.005, 0.005, 0.06, 12]} />
-          <meshStandardMaterial color="#dfe4ea" roughness={0.25} metalness={1} />
-        </mesh>
+      <group ref={leftFlip} position={[0.33, PLAY.y + 0.02, 0.085]}>
+        <FlipperMesh side={1} />
       </group>
-    </group>
+      <group ref={rightFlip} position={[0.33, PLAY.y + 0.02, -0.085]}>
+        <FlipperMesh side={-1} />
+      </group>
+    </>
   );
 }
 
-/** The left habitrail arc, raised above the playfield as in the reference. */
-function Habitrail() {
-  return (
-    <group position={[-0.3, PLAY.y + 0.09, -0.13]}>
-      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[0.12, 0.008, 10, 40, Math.PI * 1.15]} />
-        <meshStandardMaterial color="#c9ced6" roughness={0.25} metalness={0.95} />
-      </mesh>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} position={[0.11, -0.04 - i * 0.018, 0.09]}>
-          <cylinderGeometry args={[0.004, 0.004, 0.05, 8]} />
-          <meshStandardMaterial color="#7d838c" roughness={0.35} metalness={0.9} />
-        </mesh>
-      ))}
-    </group>
-  );
+function quatFromY(angle: number): { x: number; y: number; z: number; w: number } {
+  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+  return { x: q.x, y: q.y, z: q.z, w: q.w };
 }
 
-function Table() {
-  // Built here, inside the Canvas: the texture helper needs `document`.
+// ------------------------------------------------------------------ cabinet shell
+
+function Cabinet() {
   const textures = useMemo(() => makeWoodTextures(), []);
   const wood = useMemo(
     () =>
@@ -259,8 +670,6 @@ function Table() {
   return (
     <group>
       <Slate />
-
-      {/* Cabinet sides */}
       {[
         { pos: [0, PLAY.y - 0.02, outerW / 2 + 0.005], size: [outerL, RAIL_H, RAIL] },
         { pos: [0, PLAY.y - 0.02, -(outerW / 2 + 0.005)], size: [outerL, RAIL_H, RAIL] },
@@ -280,12 +689,16 @@ function Table() {
         </RoundedBox>
       ))}
 
-      {/* Inside walls the ball will bounce from. */}
+      {/* Inner walls, drawn to match the colliders. */}
       {[
-        { pos: [0, PLAY.y + 0.02, PLAY.w / 2 + 0.006], size: [PLAY.l, 0.04, 0.012] },
-        { pos: [0, PLAY.y + 0.02, -(PLAY.w / 2 + 0.006)], size: [PLAY.l, 0.04, 0.012] },
-        { pos: [PLAY.l / 2 + 0.006, PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
-        { pos: [-(PLAY.l / 2 + 0.006), PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
+        { pos: [0, PLAY.y + 0.02, HALF_W + 0.006], size: [PLAY.l, 0.04, 0.012] },
+        { pos: [0, PLAY.y + 0.02, -(HALF_W + 0.006)], size: [PLAY.l, 0.04, 0.012] },
+        { pos: [HALF_L + 0.006, PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
+        { pos: [-(HALF_L + 0.006), PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
+        {
+          pos: [(DIVIDER_FROM + DIVIDER_TO) / 2, PLAY.y + 0.02, DIVIDER_Z],
+          size: [DIVIDER_FROM - DIVIDER_TO, 0.04, 0.012],
+        },
       ].map((r, i) => (
         <mesh key={`w${i}`} position={r.pos as [number, number, number]} castShadow receiveShadow>
           <boxGeometry args={r.size as [number, number, number]} />
@@ -293,20 +706,38 @@ function Table() {
         </mesh>
       ))}
 
-      <Bumper x={-0.2} z={-0.11} />
-      <Bumper x={-0.28} z={0} color={NEON_VIOLET} />
-      <Bumper x={-0.2} z={0.11} />
-      <Bumper x={-0.06} z={0} color="#ffd166" />
+      <Bumper x={-0.13} z={-0.085} />
+      <Bumper x={-0.13} z={0.085} />
+      <Bumper x={-0.26} z={0} color={NEON_VIOLET} />
+      <Bumper x={-0.4} z={-0.13} color={AMBER} />
 
-      <DropTargets x={-0.36} />
-      <Posts />
-      <Habitrail />
+      <DropTargets x={-0.4} />
+      <RolloverRing />
+      <Spinner x={-0.02} z={0.19} />
 
       <Slingshot side={1} />
       <Slingshot side={-1} />
-      <Flipper side={1} />
-      <Flipper side={-1} />
-      <Plunger />
+
+      <Post x={0.3} z={0.2} />
+      <Post x={0.3} z={-0.2} />
+
+      {CIRCUIT.slice(0, -1).map(([x0, z0], i) => {
+        const [x1, z1] = CIRCUIT[i + 1];
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        const len = Math.hypot(dx, dz);
+        return (
+          <mesh
+            key={`circ${i}`}
+            position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
+            rotation={[0, Math.atan2(-dz, dx), 0]}
+            castShadow
+          >
+            <boxGeometry args={[len, 0.04, 0.012]} />
+            <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+          </mesh>
+        );
+      })}
 
       {/* Apron and legs */}
       <mesh position={[0.62, PLAY.y - 0.07, 0]} castShadow receiveShadow>
@@ -330,6 +761,22 @@ function Table() {
 }
 
 export function PinballTable() {
+  const [score, setScore] = useState(0);
+  const [charge, setCharge] = useState(0);
+  const [best, setBest] = useState(0);
+
+  useEffect(() => {
+    const v = Number(window.localStorage.getItem("imarket:pinball:best") || 0);
+    if (v > 0) setBest(v);
+  }, []);
+
+  useEffect(() => {
+    if (score > best) {
+      setBest(score);
+      window.localStorage.setItem("imarket:pinball:best", String(score));
+    }
+  }, [score, best]);
+
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#050506]">
       <Canvas
@@ -356,29 +803,39 @@ export function PinballTable() {
         />
         <directionalLight position={[1.2, 2.4, 1.2]} intensity={0.8} color="#ffe9c8" castShadow />
 
-        <Table />
+        <Cabinet />
+        <Pinball onScore={setScore} onCharge={setCharge} />
 
-        <mesh position={[0, FLOOR_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[16, 16]} />
           <meshStandardMaterial color="#060606" roughness={1} metalness={0} />
         </mesh>
       </Canvas>
 
+      {/* HUD */}
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
         <div className="flex items-start justify-between">
-          <a
-            href="/"
-            className="pointer-events-auto font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-white"
-          >
-            ← Hall
-          </a>
-          <p className="font-display text-[10px] uppercase tracking-[0.18em] text-zinc-600">
-            Pinball
+          <div>
+            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Score</p>
+            <p className="font-display text-2xl tabular-nums text-zinc-100">{score}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Best</p>
+            <p className="font-display text-2xl tabular-nums text-zinc-100">{best}</p>
+          </div>
+        </div>
+
+        <div className="mx-auto mb-24 w-40">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-amber-300 transition-[width] duration-75"
+              style={{ width: `${Math.round(charge * 100)}%` }}
+            />
+          </div>
+          <p className="mt-1 text-center font-display text-[9px] uppercase tracking-[0.16em] text-zinc-400">
+            hold space · release to launch
           </p>
         </div>
-        <p className="mx-auto rounded-sm bg-black/55 px-3 py-1 text-center font-display text-[9px] uppercase tracking-[0.16em] text-zinc-400">
-          table only · no physics yet
-        </p>
       </div>
     </div>
   );
