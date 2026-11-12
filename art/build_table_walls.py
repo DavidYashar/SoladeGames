@@ -145,7 +145,9 @@ def main() -> None:
     walls = {
         # Perimeter: the same profile as the internal walls.
         "outerLeft": [(-HALF_L, HALF_W), (HALF_L, HALF_W)],
-        "outerLane": [(HALF_L, -HALF_W), (0.3, -HALF_W)],
+        # Runs the full length so it meets the head arc: the lane wall used to stop
+        # at x = 0.3 and left the right side of the field open.
+        "outerLane": [(HALF_L, -HALF_W), (-0.31, -HALF_W)],
         "outerNear": [(HALF_L, HALF_W), (HALF_L, -HALF_W)],
         # Internal.
         "divider": [(DIVIDER_FROM, DIVIDER_Z), (DIVIDER_TO, DIVIDER_Z)],
