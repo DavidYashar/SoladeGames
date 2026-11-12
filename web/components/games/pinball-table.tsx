@@ -61,11 +61,14 @@ const BALL_R = 0.0135;
  * read this list, so they cannot drift apart.
  */
 const BUMPERS: { x: number; dz: number; color: string; big: boolean }[] = [
+  // Upper arc, from the layout sheets.
   { x: -0.24, dz: -0.085, color: NEON, big: true },
   { x: -0.24, dz: 0.085, color: NEON, big: true },
   { x: -0.335, dz: 0, color: NEON_VIOLET, big: true },
-  { x: -0.02, dz: -0.15, color: AMBER, big: true },
-  { x: -0.02, dz: 0.15, color: AMBER, big: true },
+  // Centre pair, sitting in the rollover ring above the flippers: anything coming
+  // back down the middle is sent up the table again.
+  { x: -0.02, dz: 0, color: AMBER, big: true },
+  { x: 0.12, dz: 0, color: AMBER, big: true },
 ];
 const PLUNGER_X = HALF_L - 0.115;
 
@@ -500,8 +503,8 @@ function Pinball({
       for (const side of [1, -1] as const) {
         const pts: [number, number][] = [
           [0.04, M(side * 0.21)],
-          [0.19, M(side * 0.175)],
-          [0.33, M(side * 0.125)],
+          [0.16, M(side * 0.185)],
+          [0.27, M(side * 0.15)],
         ];
         for (let i = 0; i < pts.length - 1; i += 1) {
           const [x0, z0] = pts[i];
@@ -516,6 +519,14 @@ function Pinball({
               .setFriction(0.05)
               .setRestitution(0.35),
           );
+          if (i === pts.length - 2) {
+            w.createCollider(
+              RAPIER.ColliderDesc.cylinder(0.03, 0.009)
+                .setTranslation(x1, PLAY.y + 0.03, z1)
+                .setFriction(0.05)
+                .setRestitution(0.4),
+            );
+          }
         }
       }
 
@@ -960,8 +971,8 @@ function Cabinet() {
       {[1, -1].map((side) => {
         const pts: [number, number][] = [
           [0.04, M(side * 0.21)],
-          [0.19, M(side * 0.175)],
-          [0.33, M(side * 0.125)],
+          [0.16, M(side * 0.185)],
+          [0.27, M(side * 0.15)],
         ];
         return pts.slice(0, -1).map(([x0, z0], i) => {
           const [x1, z1] = pts[i + 1];
@@ -969,15 +980,22 @@ function Cabinet() {
           const dz = z1 - z0;
           const len = Math.hypot(dx, dz);
           return (
-            <mesh
-              key={`fun${side}${i}`}
-              position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
-              rotation={[0, Math.atan2(-dz, dx), 0]}
-              castShadow
-            >
-              <boxGeometry args={[len, 0.04, 0.009]} />
-              <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-            </mesh>
+            <group key={`fun${side}${i}`}>
+              <mesh
+                position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
+                rotation={[0, Math.atan2(-dz, dx), 0]}
+                castShadow
+              >
+                <boxGeometry args={[len, 0.04, 0.009]} />
+                <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+              </mesh>
+              {i === 2 - 1 ? (
+                <mesh position={[x1, PLAY.y + 0.02, z1]} castShadow>
+                  <cylinderGeometry args={[0.009, 0.009, 0.04, 16]} />
+                  <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+                </mesh>
+              ) : null}
+            </group>
           );
         });
       })}
