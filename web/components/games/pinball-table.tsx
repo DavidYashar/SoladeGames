@@ -56,10 +56,12 @@ const RAIL_H = 0.055;
 
 const SLATE = "#1d222a";
 const NEON = "#22e0ff";
+const WHITE = new THREE.Color("#ffffff");
 const NEON_VIOLET = "#a06bff";
 const AMBER = "#ffd166";
 
 const BALL_R = 0.0135;
+const BELL_R = 0.034;
 
 /**
  * The head of the table: a semicircle from the left rail round to the lane divider.
@@ -96,7 +98,7 @@ const PLUNGER_X = HALF_L - 0.115;
 
 /** Flipper geometry in radians. Each bat sweeps exactly 30 degrees and comes back. */
 const FLIP_REST = 0.785;
-const FLIP_SWING = 0.524;
+const FLIP_SWING = 0.524 * 1.5;
 const DOWNHILL = 1.5;
 const MAX_SPEED = 5.2;
 
@@ -299,6 +301,7 @@ function Bumper({
 }) {
   const { scene } = useGLTF("/models/pinball/bumper.glb");
   const cap = useRef<THREE.MeshStandardMaterial | null>(null);
+  const baseEmissive = useRef(new THREE.Color(color).multiplyScalar(0.5));
 
   const object = useMemo(() => {
     // A darker cap, so the white face and its number stand out.
@@ -326,19 +329,37 @@ function Bumper({
     return root;
   }, [scene, color]);
 
+  const burst = useRef<THREE.PointLight>(null);
+
   useFrame(() => {
-    const material = cap.current;
-    if (!material) return;
     const struck = shared.flash[id] ?? 0;
     const since = (performance.now() - struck) / 1000;
-    const level = since < 0.35 ? 1 - since / 0.35 : 0;
-    material.emissiveIntensity = 0.55 + level * 5;
+    // Bright and quick, then a short tail, so a hit is unmistakable.
+    const level = since < 0.45 ? Math.pow(1 - since / 0.45, 1.6) : 0;
+
+    const material = cap.current;
+    if (material) {
+      material.emissiveIntensity = 0.55 + level * 9;
+      material.emissive.copy(baseEmissive.current).lerp(WHITE, level * 0.85);
+    }
+    // The material glow alone reads weakly against the lit playfield, so the bell also
+    // throws light for as long as it is flashing.
+    if (burst.current) burst.current.intensity = level * 2.6;
+
   });
 
   const face = useMemo(() => makeBellFace(value, color), [value, color]);
 
   return (
     <group position={[x, PLAY.y, z]}>
+      <pointLight
+        ref={burst}
+        position={[0, 0.055, 0]}
+        color={color}
+        intensity={0}
+        distance={0.26}
+        decay={2}
+      />
       <primitive object={object} />
       <mesh position={[0, 0.0435, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.0225, 48]} />
@@ -754,7 +775,7 @@ function Pinball({
       BUMPERS.forEach((b) => {
         const z = M(b.dz);
         const c = w.createCollider(
-          RAPIER.ColliderDesc.ball(0.034)
+          RAPIER.ColliderDesc.ball(BELL_R)
             .setTranslation(b.x, PLAY.y + 0.034, z)
             .setFriction(0.02)
             .setRestitution(0.9),
@@ -1141,9 +1162,11 @@ function Pinball({
         const dx = t.x - b.x;
         const dz = t.z - bz;
         const distance = Math.hypot(dx, dz);
-        if (distance > 0.05) return;
+        // Bell (0.034) + ball (0.0135) + a margin, so a fast ball cannot step over the
+        // trigger between two frames and pass through without a kick.
+        if (distance > 0.062) return;
         if (now < (bumperCooldown.current[index] ?? 0)) return;
-        bumperCooldown.current[index] = now + 220;
+        bumperCooldown.current[index] = now + 200;
 
         shared.flash[index] = now;
         shared.combo = Math.min(6, shared.combo + 1);
@@ -1154,12 +1177,22 @@ function Pinball({
         shared.score += value;
         shared.onScore?.(shared.score);
 
+        // Radial direction, with a fallback when the ball is dead centre.
         const len = distance || 1;
         const dir = distance > 0.004 ? { x: dx / len, z: dz / len } : { x: 0.6, z: 0.8 };
+
+        // Put the ball just clear of the bell before kicking: otherwise the solver
+        // spends the impulse pushing it out of the collider and it barely moves.
+        const clear = BELL_R + BALL_R + 0.002;
+        ball.setTranslation(
+          { x: b.x + dir.x * clear, y: PLAY.y + BALL_R + 0.002, z: bz + dir.z * clear },
+          true,
+        );
+
         const v = ball.linvel();
         const incoming = Math.hypot(v.x, v.z);
-        const outSpeed = Math.min(6.5, Math.max(2.8, incoming * 0.85 + 2.2));
-        ball.setLinvel({ x: dir.x * outSpeed, y: 0.35, z: dir.z * outSpeed }, true);
+        const outSpeed = Math.min(MAX_SPEED, Math.max(3.2, incoming * 0.85 + 2.2));
+        ball.setLinvel({ x: dir.x * outSpeed, y: 0.2, z: dir.z * outSpeed }, true);
       });
 
       for (const side of [1, -1] as const) {

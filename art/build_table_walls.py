@@ -41,8 +41,8 @@ M = lambda dz: CENTER_Z + dz
 NEAR_LEFT = (HALF_L, HALF_W)      # near end of the left rail
 NEAR_RIGHT = (HALF_L, -HALF_W)    # near end of the corridor rail
 FAR = (-0.378, -0.2)              # the tip where the head arc meets the lane exit
-DIVIDER_NEAR = (HALF_L - 0.1, DIVIDER_Z)   # divider's near end
-DIVIDER_FAR = (-0.22, DIVIDER_Z)           # divider's far end
+DIVIDER_NEAR = (HALF_L, DIVIDER_Z)        # meets the lower outer wall
+DIVIDER_FAR = (-0.2875, DIVIDER_Z)        # 22 mm from the lane exit
 LANE_RAIL_END = (-0.31, -HALF_W)   # corridor rail -> lane exit
 
 # The head arc runs from the left rail round to FAR. Its centre is solved so that the
