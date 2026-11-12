@@ -81,15 +81,15 @@ const TOP_ARC: [number, number][] = (() => {
  * field, and two larger ones flanking the middle. Both the visuals and the colliders
  * read this list, so they cannot drift apart.
  */
-const BUMPERS: { x: number; dz: number; color: string; big: boolean }[] = [
+const BUMPERS: { x: number; dz: number; color: string; value: number }[] = [
   // Upper cluster: two side by side and one below, as in the layout sheet.
-  { x: -0.18, dz: -0.095, color: NEON, big: true },
-  { x: -0.18, dz: 0.095, color: NEON, big: true },
-  { x: -0.27, dz: 0, color: NEON_VIOLET, big: true },
-  // Centre pair, sitting in the rollover ring above the flippers: anything coming
-  // back down the middle is sent up the table again.
-  { x: -0.02, dz: 0, color: AMBER, big: true },
-  { x: 0.12, dz: 0, color: AMBER, big: true },
+  { x: -0.18, dz: -0.095, color: "#a06bff", value: 30 },
+  { x: -0.18, dz: 0.095, color: "#22e0ff", value: 20 },
+  { x: -0.27, dz: 0, color: "#ffd166", value: 10 },
+  // Centre pair, above the flippers: anything coming back down the middle is sent
+  // back up the table.
+  { x: -0.02, dz: 0, color: "#ffd166", value: 10 },
+  { x: 0.12, dz: 0, color: "#22e0ff", value: 20 },
 ];
 const PLUNGER_X = HALF_L - 0.115;
 
@@ -109,6 +109,16 @@ const PART_STEEL = new THREE.MeshStandardMaterial({
   color: "#c3c9d1",
   roughness: 0.22,
   metalness: 0.95,
+});
+const PART_RED = new THREE.MeshStandardMaterial({
+  color: "#c8202a",
+  roughness: 0.3,
+  metalness: 0.12,
+});
+const PART_CREAM = new THREE.MeshStandardMaterial({
+  color: "#f1ebdf",
+  roughness: 0.42,
+  metalness: 0.05,
 });
 const PART_RUBBER = new THREE.MeshStandardMaterial({
   color: "#14171b",
@@ -215,17 +225,60 @@ function Slate() {
   );
 }
 
+/** A bell's face: sunburst ring and point value, drawn to a canvas. */
+function makeBellFace(value: number, color: string): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = "#f4f1e6";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  for (let i = 0; i < 16; i += 1) {
+    const a = (i / 16) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(size / 2 + Math.cos(a) * (size / 2 - 4), size / 2 + Math.sin(a) * (size / 2 - 4));
+    ctx.lineTo(
+      size / 2 + Math.cos(a + 0.13) * (size / 2 - 30),
+      size / 2 + Math.sin(a + 0.13) * (size / 2 - 30),
+    );
+    ctx.lineTo(
+      size / 2 + Math.cos(a - 0.13) * (size / 2 - 30),
+      size / 2 + Math.sin(a - 0.13) * (size / 2 - 30),
+    );
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "#101418";
+  ctx.font = "bold 104px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(value), size / 2, size / 2 + 8);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 /** Pop bumper: drum, neon cap, and a skirt in the colour of the reference objects. */
 function Bumper({
   id,
   x,
   z,
   color = NEON,
+  value = 10,
 }: {
   id: number;
   x: number;
   z: number;
   color?: string;
+  value?: number;
 }) {
   const { scene } = useGLTF("/models/pinball/bumper.glb");
   const cap = useRef<THREE.MeshStandardMaterial | null>(null);
@@ -264,36 +317,37 @@ function Bumper({
     material.emissiveIntensity = 1.5 + level * 6;
   });
 
-  return <primitive object={object} position={[x, PLAY.y, z]} />;
-}
-
-/** Slingshot: a triangular bank with a live rubber face, as in the objects sheet. */
-function Slingshot({ side }: { side: 1 | -1 }) {
-  const shape = useMemo(() => {
-    const s = new THREE.Shape();
-    s.moveTo(0, 0);
-    s.lineTo(0.11, 0.012);
-    s.lineTo(0.02, 0.05);
-    s.closePath();
-    return s;
-  }, []);
+  const face = useMemo(() => makeBellFace(value, color), [value, color]);
 
   return (
-    <group position={[0.14, PLAY.y + 0.022, side * 0.15]} rotation={[Math.PI / 2, 0, side * -0.5]}>
-      <mesh castShadow receiveShadow>
-        <extrudeGeometry args={[shape, { depth: 0.022, bevelEnabled: false }]} />
-        <meshStandardMaterial color="#23272e" roughness={0.4} metalness={0.55} />
-      </mesh>
-      <mesh position={[0.03, 0.004, 0.023]}>
-        <boxGeometry args={[0.07, 0.008, 0.006]} />
-        <meshStandardMaterial
-          color={NEON_VIOLET}
-          emissive={NEON_VIOLET}
-          emissiveIntensity={1.8}
-          roughness={0.3}
-        />
+    <group position={[x, PLAY.y, z]}>
+      <primitive object={object} />
+      <mesh position={[0, 0.0435, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.0225, 48]} />
+        <meshBasicMaterial map={face} transparent toneMapped={false} />
       </mesh>
     </group>
+  );
+}
+
+const SLING_MAP = {
+  Slingshot: PART_RED,
+  Border: PART_CREAM,
+  Screw0: PART_STEEL,
+  Screw1: PART_STEEL,
+  Screw2: PART_STEEL,
+};
+
+/** The red triangle from the icon set: a kicker beside each flipper. */
+function Slingshot({ side }: { side: 1 | -1 }) {
+  // Sits just inside the funnel, its long edge following the funnel's slope.
+  return (
+    <GltfPart
+      url="/models/pinball/slingshot.glb"
+      mapping={SLING_MAP}
+      position={[0.19, PLAY.y + 0.011, M(side * 0.163)]}
+      rotation={[0, side > 0 ? -0.32 : Math.PI + 0.32, 0]}
+    />
   );
 }
 
@@ -304,8 +358,8 @@ function Slingshot({ side }: { side: 1 | -1 }) {
 function FlipperMesh({ side }: { side: 1 | -1 }) {
   const mapping = useMemo(
     () => ({
-      Rubber: PART_RUBBER,
-      Bat: PART_STEEL,
+      Rubber: PART_CREAM,
+      Bat: PART_RED,
       Hub: PART_STEEL,
       HubRing: PART_METAL,
     }),
@@ -582,6 +636,18 @@ function Pinball({
         );
       }
 
+      // Slingshot faces: a kicker just inside each funnel.
+      for (const side of [1, -1] as const) {
+        const c = w.createCollider(
+          RAPIER.ColliderDesc.cuboid(0.055, 0.03, 0.012)
+            .setTranslation(0.22, PLAY.y + 0.03, M(side * 0.152))
+            .setRotation(quatFromY(side > 0 ? -0.32 : Math.PI + 0.32))
+            .setFriction(0.04)
+            .setRestitution(1.15),
+        );
+        scoring.current[c.handle] = 25;
+      }
+
       // Funnels: two walls per side running from the side rail down to the flipper
       // pivot. Anything coming down the side is delivered onto a flipper, which is
       // what keeps the ball alive.
@@ -628,7 +694,7 @@ function Pinball({
             .setFriction(0.02)
             .setRestitution(0.9),
         );
-        scoring.current[c.handle] = 100;
+        scoring.current[c.handle] = b.value;
         bumperAt.set(c.handle, { x: b.x, z });
         bumperHandles.current.set(c.handle, BUMPERS.indexOf(b));
       });
@@ -1096,6 +1162,8 @@ function Cabinet() {
       <Spinner x={-0.1} z={M(-0.185)} />
 
       <PlungerSpring />
+      <Slingshot side={1} />
+      <Slingshot side={-1} />
       <Post x={0.3} z={M(0.2)} />
       <Post x={0.3} z={M(-0.2)} />
 
@@ -1210,6 +1278,7 @@ function Cabinet() {
 useGLTF.preload("/models/pinball/bumper.glb");
 useGLTF.preload("/models/pinball/flipper.glb");
 useGLTF.preload("/models/pinball/post.glb");
+useGLTF.preload("/models/pinball/slingshot.glb");
 
 export function PinballTable() {
   const [score, setScore] = useState(0);

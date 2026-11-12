@@ -182,7 +182,7 @@ def build_flipper() -> None:
     rubber = bpy.data.objects.new("Rubber", rubber_mesh)
     bpy.context.collection.objects.link(rubber)
     rs = rubber.modifiers.new("Solidify", "SOLIDIFY")
-    rs.thickness = 0.016
+    rs.thickness = 0.009
     rs.offset = 0.0
     bpy.context.view_layer.objects.active = rubber
     bpy.ops.object.modifier_apply(modifier=rs.name)
@@ -247,6 +247,56 @@ def build_target() -> None:
     export("target", [plate, face])
 
 
+
+
+# ---------------------------------------------------------------- slingshot
+def build_slingshot() -> None:
+    """The big red triangle from the icon set: plate, cream border, three screws."""
+    clear()
+
+    tri = [(0.0, 0.0), (0.115, 0.015), (0.03, 0.075)]
+
+    mesh = bpy.data.meshes.new("TriangleProfile")
+    mesh.from_pydata([(x, y, 0) for x, y in tri], [], [[0, 1, 2]])
+    mesh.update()
+    plate = bpy.data.objects.new("Slingshot", mesh)
+    bpy.context.collection.objects.link(plate)
+    solid = plate.modifiers.new("Solidify", "SOLIDIFY")
+    solid.thickness = 0.018
+    solid.offset = 0.0
+    bpy.context.view_layer.objects.active = plate
+    bpy.ops.object.modifier_apply(modifier=solid.name)
+    apply_bevel(plate, 0.004, 4)
+
+    border_mesh = bpy.data.meshes.new("BorderProfile")
+    border_mesh.from_pydata(
+        [(x * 1.05 - 0.002, y * 1.05 - 0.002, 0) for x, y in tri], [], [[0, 1, 2]]
+    )
+    border_mesh.update()
+    border = bpy.data.objects.new("Border", border_mesh)
+    bpy.context.collection.objects.link(border)
+    bs = border.modifiers.new("Solidify", "SOLIDIFY")
+    bs.thickness = 0.011
+    bs.offset = 0.0
+    bpy.context.view_layer.objects.active = border
+    bpy.ops.object.modifier_apply(modifier=bs.name)
+    apply_bevel(border, 0.005, 3)
+
+    screws = []
+    for i, (sx, sy) in enumerate([(0.012, 0.010), (0.1, 0.02), (0.035, 0.066)]):
+        screw = cylinder(f"Screw{i}", 0.0055, 0.026, 0.0, verts=24)
+        screw.location = (sx, sy, 0.0)
+        bpy.context.view_layer.objects.active = screw
+        bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+        apply_bevel(screw, 0.0012, 2)
+        screws.append(screw)
+
+    for obj in [plate, border] + screws:
+        smooth(obj)
+
+    export("slingshot", [plate, border] + screws)
+
+
 if __name__ == "__main__":
     print("building pinball parts")
     build_bumper()
@@ -254,4 +304,5 @@ if __name__ == "__main__":
     build_ball()
     build_post()
     build_target()
+    build_slingshot()
     print("done")
