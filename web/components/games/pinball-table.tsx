@@ -369,6 +369,34 @@ function Bumper({
   );
 }
 
+const BUMPER_TOP_POS: [number, number] = [-0.4, M(0)];
+
+/** The wide red bumper from its artwork, sitting below the head curve. */
+function TopBumper() {
+  const map = useMemo(
+    () => ({
+      Casing: PART_CREAM,
+      Frame: PART_DARK,
+      Face: new THREE.MeshStandardMaterial({
+        color: "#d62324",
+        roughness: 0.28,
+        metalness: 0.15,
+      }),
+      Screw: PART_STEEL,
+    }),
+    [],
+  );
+  const [x, z] = BUMPER_TOP_POS;
+  return (
+    <GltfPart
+      url="/models/pinball/curved_bumper.glb"
+      mapping={map}
+      position={[x, PLAY.y + 0.004, z]}
+      rotation={[0, Math.PI / 2, 0]}
+    />
+  );
+}
+
 /** The amber plate traced from the artwork, one per arm corner. */
 function Slingshot({ side }: { side: 1 | -1 }) {
   const { x, z, theta } = slingPlacement(side);
@@ -710,6 +738,25 @@ function Pinball({
         if (score) scoring.current[collider.handle] = score;
         return collider;
       };
+
+      // Top bumper: three boxes traced from its own artwork. The middle is shallower
+      // than the wings, so one box across the whole thing would block the dip.
+      for (const part of [
+        { dx: -0.003, dz: 0.066, hx: 0.047, hz: 0.033 },
+        { dx: -0.012, dz: 0.0, hx: 0.032, hz: 0.033 },
+        { dx: -0.003, dz: -0.066, hx: 0.047, hz: 0.033 },
+      ]) {
+        w.createCollider(
+          RAPIER.ColliderDesc.cuboid(part.hx, 0.022, part.hz)
+            .setTranslation(
+              BUMPER_TOP_POS[0] + part.dx,
+              PLAY.y + 0.022,
+              BUMPER_TOP_POS[1] + part.dz,
+            )
+            .setFriction(0.06)
+            .setRestitution(0.55),
+        );
+      }
 
       // Head curve, corridor divider and lane exit: colliders built from the same
       // segment list Blender used to model them, so mesh and physics cannot drift.
@@ -1368,6 +1415,7 @@ function Cabinet() {
       <LaneWall side={1} />
       <LaneWall side={-1} />
 
+      <TopBumper />
       <TableWalls />
 
       {/* Cabinet body: the box the playfield drops into. */}

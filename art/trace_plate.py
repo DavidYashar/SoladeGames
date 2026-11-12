@@ -18,12 +18,17 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+import sys
+
 HERE = Path(__file__).resolve().parent
-SRC = HERE / "reference" / "plate.png"
 OUT = HERE / "out"
 OUT.mkdir(exist_ok=True)
 
-LONG_SIDE_M = 0.115  # metres across the plate's longest dimension
+# usage: trace_plate.py [image] [output-stem] [long-side-metres]
+NAME = sys.argv[1] if len(sys.argv) > 1 else "plate"
+STEM = sys.argv[2] if len(sys.argv) > 2 else "plate_contours"
+SRC = HERE / "reference" / f"{NAME}.png"
+LONG_SIDE_M = float(sys.argv[3]) if len(sys.argv) > 3 else 0.115
 
 
 def classify(rgb: np.ndarray, alpha: np.ndarray) -> dict[str, np.ndarray]:
@@ -33,12 +38,13 @@ def classify(rgb: np.ndarray, alpha: np.ndarray) -> dict[str, np.ndarray]:
     sat = mx - mn
     solid = alpha > 128
 
-    amber = solid & (r > 190) & (g > 120) & (g < 225) & (b < 150) & ((r - b) > 80)
-    cream = solid & (mx > 195) & (sat < 40) & ~amber
-    dark = solid & (mx < 90)
-    metal = solid & ~amber & ~cream & ~dark & (sat < 55) & (mx >= 90) & (mx <= 200)
+    cream = solid & (mx > 185) & (sat < 45)
+    dark = solid & (mx < 80)
+    metal = solid & ~cream & ~dark & (sat < 55) & (mx >= 80) & (mx <= 200)
+    # The body is whatever is left, so the pipeline is not tied to one colour.
+    face = solid & ~cream & ~dark & ~metal
 
-    return {"amber": amber, "cream": cream, "dark": dark, "metal": metal}
+    return {"face": face, "cream": cream, "dark": dark, "metal": metal}
 
 
 def largest_component(mask: np.ndarray) -> np.ndarray:
@@ -151,15 +157,19 @@ def main() -> None:
     palette = {
         "cream": (240, 235, 220, 255),
         "dark": (40, 40, 45, 255),
-        "amber": (225, 150, 40, 255),
+        "face": (200, 60, 60, 255),
         "metal": (150, 160, 170, 255),
     }
     for name, mask in classes.items():
         debug[mask] = palette[name]
-    Image.fromarray(debug, "RGBA").save(OUT / "plate_classes.png")
+    Image.fromarray(debug, "RGBA").save(OUT / f"{STEM}_classes.png")
 
     for name, mask in classes.items():
         print(f"{name:6s} pixels: {int(mask.sum())}")
+
+    face_px = rgb[classes["face"]]
+    face_colour = "#%02x%02x%02x" % tuple(int(v) for v in face_px.mean(axis=0)) if len(face_px) else "#c81f1f"
+    print("face colour:", face_colour)
 
     # metres per pixel, centred on the silhouette
     ys, xs = np.where(alpha > 128)
@@ -176,15 +186,15 @@ def main() -> None:
     # The regions nest: cream contains dark contains amber contains the screws.
     # Fill from the inside out so each layer's boundary is its outer edge only.
     metal = classes["metal"]
-    amber_filled = classes["amber"] | metal
-    dark_filled = classes["dark"] | amber_filled
+    face_filled = classes["face"] | metal
+    dark_filled = classes["dark"] | face_filled
     cream_filled = classes["cream"] | dark_filled
 
     result = {}
     for name, mask in (
         ("cream", cream_filled),
         ("dark", dark_filled),
-        ("amber", amber_filled),
+        ("face", face_filled),
     ):
         comp = largest_component(mask)
         contour = trace(comp)
@@ -225,10 +235,11 @@ def main() -> None:
         for _, px, py in comps[:2]:
             screws.append(to_model((int(py), int(px))))  # to_model takes (y, x)
     result["screws"] = screws
+    result["faceColor"] = face_colour
     print("screws:", [tuple(round(v, 4) for v in s) for s in screws])
 
-    (OUT / "plate_contours.json").write_text(json.dumps(result), encoding="utf-8")
-    print("wrote", OUT / "plate_contours.json")
+    (OUT / f"{STEM}.json").write_text(json.dumps(result), encoding="utf-8")
+    print("wrote", OUT / f"{STEM}.json")
 
 
 main()

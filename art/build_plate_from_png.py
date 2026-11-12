@@ -17,12 +17,19 @@ import bpy
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "web" / "public" / "models" / "pinball"
-DATA = HERE / "out" / "plate_contours.json"
+import sys
+
+# usage: blender -b --python build_plate_from_png.py -- [stem] [output-name]
+# Blender keeps its own flags in sys.argv, so only read what follows "--".
+_args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+STEM = _args[0] if len(_args) > 0 else "plate_contours"
+NAME = _args[1] if len(_args) > 1 else "slingshot"
+DATA = HERE / "out" / f"{STEM}.json"
 
 LAYERS = {
     "cream": ("Casing", 0.012, -0.006),
     "dark": ("Frame", 0.015, -0.003),
-    "amber": ("Face", 0.018, 0.001),
+    "face": ("Face", 0.018, 0.001),
 }
 
 
@@ -98,6 +105,10 @@ def main() -> None:
         parts.append(build(name, points, thickness, z))
         print(f"  {name}: {len(points)} points")
 
+    colour = data.get("faceColor")
+    if colour:
+        print(f"  face colour {colour}")
+
     for i, (x, y) in enumerate(data.get("screws", [])[:2]):
         parts += screw(f"Screw{i}", x, y, 0.011)
 
@@ -106,7 +117,7 @@ def main() -> None:
         obj.select_set(True)
     bpy.context.view_layer.objects.active = parts[0]
 
-    path = OUT / "slingshot.glb"
+    path = OUT / f"{NAME}.glb"
     bpy.ops.export_scene.gltf(
         filepath=str(path),
         export_format="GLB",
