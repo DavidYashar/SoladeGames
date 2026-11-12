@@ -24,8 +24,18 @@ const PLAY = { w: 0.54, l: 1.08, y: 0.85 };
 const HALF_W = PLAY.w / 2;
 const HALF_L = PLAY.l / 2;
 
-const CORRIDOR_Z = -HALF_W + 0.052;
-const DIVIDER_Z = -HALF_W + 0.092;
+// Lane width is two thirds of what it was: 55 mm, about two ball widths.
+const LANE_W = 0.055;
+const CORRIDOR_Z = -HALF_W + 0.012 + LANE_W / 2;
+const DIVIDER_Z = -HALF_W + 0.012 + LANE_W - 0.008;
+
+/**
+ * The playfield is not centred on the cabinet: the lane eats the right-hand strip, so
+ * everything is mirrored about the lane's inner face instead. That is what keeps the
+ * layout symmetric for the player.
+ */
+const CENTER_Z = (HALF_W - 0.012 + DIVIDER_Z + 0.008) / 2;
+const M = (dz: number) => CENTER_Z + dz;
 const DIVIDER_FROM = HALF_L - 0.1;
 const DIVIDER_TO = -0.3;
 
@@ -244,11 +254,19 @@ function PlungerSpring() {
 }
 
 /** Drop target bank. */
-function DropTargets({ x }: { x: number }) {
+function DropTargets() {
+  const spots: [number, number][] = [
+    [-0.03, -0.02],
+    [-0.03, 0.02],
+    [-0.06, -0.05],
+    [-0.06, 0.05],
+    [0, -0.055],
+    [0, 0.055],
+  ];
   return (
-    <group position={[x, PLAY.y, 0]}>
-      {[-0.06, -0.03, 0, 0.03, 0.06].map((z) => (
-        <group key={z} position={[0, 0, z]}>
+    <group position={[0, PLAY.y, 0]}>
+      {spots.map(([tx, tz]) => (
+        <group key={`${tx}${tz}`} position={[tx, 0, M(tz)]}>
           <mesh position={[0, 0.014, 0]} castShadow receiveShadow>
             <boxGeometry args={[0.01, 0.028, 0.022]} />
             <meshStandardMaterial color="#39404a" roughness={0.35} metalness={0.7} />
@@ -269,7 +287,7 @@ function DropTargets({ x }: { x: number }) {
 }
 
 /** The rollover ring: a circle of posts, exactly as in the layout sheet. */
-function RolloverRing() {
+function RolloverRing({ z }: { z: number }) {
   const ring = useMemo(() => {
     const out: [number, number][] = [];
     for (let i = 0; i < 12; i += 1) {
@@ -281,8 +299,8 @@ function RolloverRing() {
 
   return (
     <group>
-      {ring.map(([x, z]) => (
-        <group key={`${x}${z}`} position={[x, PLAY.y, z]}>
+      {ring.map(([x, dz]) => (
+        <group key={`${x}${dz}`} position={[x, PLAY.y, z + dz]}>
           <mesh position={[0, 0.012, 0]} castShadow>
             <cylinderGeometry args={[0.006, 0.006, 0.024, 12]} />
             <meshStandardMaterial color="#c9ced6" roughness={0.3} metalness={0.9} />
@@ -432,6 +450,27 @@ function Pinball({
         );
       }
 
+      // Inlane guides: two angled walls that funnel the ball toward the flippers
+      // instead of letting it leak out of the bottom corners.
+      const guide = (side: 1 | -1) => {
+        const x0 = 0.5;
+        const z0 = M(side * 0.2);
+        const x1 = 0.3;
+        const z1 = M(side * 0.088);
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        const len = Math.hypot(dx, dz);
+        w.createCollider(
+          RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.007)
+            .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
+            .setRotation(quatFromY(Math.atan2(-dz, dx)))
+            .setFriction(0.1)
+            .setRestitution(0.5),
+        );
+      };
+      guide(1);
+      guide(-1);
+
       // Bumpers: three large, as in the layout, plus the top one.
       const bumperAt = (x: number, z: number) => {
         const c = w.createCollider(
@@ -442,16 +481,17 @@ function Pinball({
         );
         scoring.current[c.handle] = 100;
       };
-      bumperAt(-0.13, -0.085);
-      bumperAt(-0.13, 0.085);
-      bumperAt(-0.26, 0);
-      bumperAt(-0.4, -0.13);
+      bumperAt(-0.15, M(-0.08));
+      bumperAt(-0.15, M(0.08));
+      bumperAt(-0.27, M(0));
+      bumperAt(-0.33, M(-0.145));
+      bumperAt(-0.33, M(0.145));
 
       // Slingshots.
       const sling = (side: 1 | -1) => {
         const c = w.createCollider(
           RAPIER.ColliderDesc.cuboid(0.06, 0.03, 0.012)
-            .setTranslation(0.16, PLAY.y + 0.03, side * 0.14)
+            .setTranslation(0.16, PLAY.y + 0.03, M(side * 0.13))
             .setRotation(quatFromY(side * -0.5))
             .setFriction(0.05)
             .setRestitution(1.2),
@@ -461,9 +501,16 @@ function Pinball({
       sling(1);
       sling(-1);
 
-      // Drop targets.
-      for (let i = 0; i < 5; i += 1) {
-        const c = box(0.008, 0.012, -0.4, -0.06 + i * 0.03, 0.7);
+      // Drop targets: a diamond of six in the middle of the field.
+      for (const [tx, tz] of [
+        [-0.03, -0.02],
+        [-0.03, 0.02],
+        [-0.06, -0.05],
+        [-0.06, 0.05],
+        [0.0, -0.055],
+        [0.0, 0.055],
+      ]) {
+        const c = box(0.008, 0.014, tx, M(tz), 0.7);
         scoring.current[c.handle] = 50;
       }
 
@@ -479,18 +526,27 @@ function Pinball({
           scoring.current[c.handle] = 10;
         }
       };
-      ring(-0.02, 0, 0.13, 12);
-      // Outlane posts.
-      box(0.008, 0.008, 0.3, 0.15, 0.6);
-      box(0.008, 0.008, 0.3, -0.145, 0.6);
+      ring(-0.02, M(0), 0.13, 12);
+      ring(-0.27, M(0), 0.075, 8);
+      // Outlane posts, just outside the flipper tips.
+      box(0.008, 0.008, 0.34, M(0.16), 0.6);
+      box(0.008, 0.008, 0.34, M(-0.155), 0.6);
+
+      // Saucer behind the top arch: catches the ball and kicks it back out.
+      const saucer = w.createCollider(
+        RAPIER.ColliderDesc.cylinder(0.02, 0.03)
+          .setTranslation(-0.38, PLAY.y + 0.02, M(0))
+          .setSensor(true),
+      );
+      scoring.current[saucer.handle] = 250;
 
       // Flippers: kinematic, so a rotation drags the ball rather than teleporting it.
       const makeFlipper = (side: 1 | -1) => {
         const body = w.createRigidBody(
           RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
-            0.33,
+            0.34,
             PLAY.y + 0.02,
-            side * 0.085,
+            M(side * 0.062),
           ),
         );
         w.createCollider(
@@ -731,6 +787,14 @@ function Pinball({
       ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
     }
 
+    // One-way gate at the top of the lane: once the ball reaches the end of the
+    // corridor it is pushed out into the playfield, as a real table's gate does.
+    if (mode.current === "play" && t.x < DIVIDER_TO - 0.015 && t.z < DIVIDER_Z) {
+      const v = ball.linvel();
+      const speed = Math.max(1.6, Math.hypot(v.x, v.z));
+      ball.setLinvel({ x: -0.35 * speed, y: 0, z: 0.94 * speed }, true);
+    }
+
     // Drained: past the flippers into the field, or under the playfield.
     if (mode.current === "play") {
       if (t.y < PLAY.y - 0.08 || (t.x > 0.45 && t.z > DIVIDER_Z + 0.012)) {
@@ -749,10 +813,10 @@ function Pinball({
         <meshStandardMaterial color="#d8dde4" roughness={0.12} metalness={0.95} />
       </mesh>
 
-      <group ref={leftFlip} position={[0.33, PLAY.y + 0.02, 0.085]}>
+      <group ref={leftFlip} position={[0.34, PLAY.y + 0.02, M(0.062)]}>
         <FlipperMesh side={1} />
       </group>
-      <group ref={rightFlip} position={[0.33, PLAY.y + 0.02, -0.085]}>
+      <group ref={rightFlip} position={[0.34, PLAY.y + 0.02, M(-0.062)]}>
         <FlipperMesh side={-1} />
       </group>
     </>
@@ -822,21 +886,61 @@ function Cabinet() {
         </mesh>
       ))}
 
-      <Bumper x={-0.13} z={-0.085} />
-      <Bumper x={-0.13} z={0.085} />
-      <Bumper x={-0.26} z={0} color={NEON_VIOLET} />
-      <Bumper x={-0.4} z={-0.13} color={AMBER} />
+      <Bumper x={-0.15} z={M(-0.08)} />
+      <Bumper x={-0.15} z={M(0.08)} />
+      <Bumper x={-0.27} z={M(0)} color={NEON_VIOLET} />
+      <Bumper x={-0.33} z={M(-0.145)} color={AMBER} />
+      <Bumper x={-0.33} z={M(0.145)} color={AMBER} />
 
-      <DropTargets x={-0.4} />
-      <RolloverRing />
-      <Spinner x={-0.02} z={0.19} />
+      <DropTargets />
+      <RolloverRing z={M(0)} />
+      <Spinner x={-0.1} z={M(0.185)} />
+      <Spinner x={-0.1} z={M(-0.185)} />
 
       <Slingshot side={1} />
       <Slingshot side={-1} />
 
       <PlungerSpring />
-      <Post x={0.3} z={0.15} />
-      <Post x={0.3} z={-0.145} />
+      <Post x={0.34} z={M(0.16)} />
+      <Post x={0.34} z={M(-0.155)} />
+      <Post x={0.44} z={M(0.2)} />
+      <Post x={0.44} z={M(-0.2)} />
+
+      {/* Inlane guides, matching their colliders. */}
+      {[-1, 1].map((side) => {
+        const x0 = 0.5;
+        const z0 = M(side * 0.2);
+        const x1 = 0.3;
+        const z1 = M(side * 0.088);
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        const len = Math.hypot(dx, dz);
+        return (
+          <mesh
+            key={`guide${side}`}
+            position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
+            rotation={[0, Math.atan2(-dz, dx), 0]}
+            castShadow
+          >
+            <boxGeometry args={[len, 0.04, 0.01]} />
+            <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+          </mesh>
+        );
+      })}
+
+      {/* Top arch with a saucer behind it. */}
+      <mesh position={[-0.33, PLAY.y + 0.02, M(0)]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.13, 0.009, 10, 28, Math.PI]} />
+        <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+      </mesh>
+      <mesh position={[-0.38, PLAY.y + 0.012, M(0)]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.012, 24]} />
+        <meshStandardMaterial color="#0a0c10" roughness={0.6} metalness={0.3} />
+      </mesh>
+      <mesh position={[-0.38, PLAY.y + 0.019, M(0)]}>
+        <ringGeometry args={[0.026, 0.032, 24]} />
+        <meshBasicMaterial color={AMBER} toneMapped={false} side={THREE.DoubleSide} />
+      </mesh>
 
       {CIRCUIT.slice(0, -1).map(([x0, z0], i) => {
         const [x1, z1] = CIRCUIT[i + 1];
