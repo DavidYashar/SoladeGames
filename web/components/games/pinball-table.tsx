@@ -593,27 +593,6 @@ function RolloverRing({ z }: { z: number }) {
   );
 }
 
-/** Spinner: a flat plate on a gate, from the objects sheet. */
-function Spinner({ x, z }: { x: number; z: number }) {
-  const plate = useRef<THREE.Mesh>(null);
-  useFrame((_, delta) => {
-    if (plate.current) plate.current.rotation.z += delta * 1.2;
-  });
-
-  return (
-    <group position={[x, PLAY.y, z]}>
-      <mesh position={[0, 0.02, -0.03]} castShadow>
-        <boxGeometry args={[0.006, 0.03, 0.006]} />
-        <meshStandardMaterial color="#8a9099" roughness={0.3} metalness={0.9} />
-      </mesh>
-      <mesh ref={plate} position={[0, 0.02, -0.03]} castShadow>
-        <boxGeometry args={[0.001, 0.04, 0.036]} />
-        <meshStandardMaterial color="#2f6f8a" emissive={NEON} emissiveIntensity={0.5} roughness={0.4} />
-      </mesh>
-    </group>
-  );
-}
-
 /** Kicker and post blockers, from the objects sheet. */
 const POST_MAP = { Shaft: PART_METAL, Head: PART_STEEL };
 
@@ -1368,8 +1347,6 @@ function Cabinet() {
 
       <DropTargets />
       <RolloverRing z={M(0)} />
-      <Spinner x={-0.1} z={M(0.185)} />
-      <Spinner x={-0.1} z={M(-0.185)} />
 
       <PlungerSpring />
       <Slingshot side={1} />
