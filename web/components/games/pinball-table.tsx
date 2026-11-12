@@ -823,14 +823,6 @@ function Pinball({
       ring(-0.02, M(0), 0.13, 12);
       ring(-0.27, M(0), 0.075, 8);
 
-      // Saucer behind the top arch: catches the ball and kicks it back out.
-      const saucer = w.createCollider(
-        RAPIER.ColliderDesc.cylinder(0.02, 0.03)
-          .setTranslation(-0.38, PLAY.y + 0.02, M(0))
-          .setSensor(true),
-      );
-      scoring.current[saucer.handle] = 250;
-
       // Flippers: kinematic, so a rotation drags the ball rather than teleporting it.
       const makeFlipper = (side: 1 | -1) => {
         const body = w.createRigidBody(
@@ -1389,20 +1381,6 @@ function Cabinet() {
       <LaneWall side={-1} />
 
       <TableWalls />
-
-      {/* Top arch with a saucer behind it. */}
-      <mesh position={[-0.33, PLAY.y + 0.02, M(0)]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.13, 0.009, 10, 28, Math.PI]} />
-        <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-      </mesh>
-      <mesh position={[-0.38, PLAY.y + 0.012, M(0)]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.012, 24]} />
-        <meshStandardMaterial color="#0a0c10" roughness={0.6} metalness={0.3} />
-      </mesh>
-      <mesh position={[-0.38, PLAY.y + 0.019, M(0)]}>
-        <ringGeometry args={[0.026, 0.032, 24]} />
-        <meshBasicMaterial color={AMBER} toneMapped={false} side={THREE.DoubleSide} />
-      </mesh>
 
       {/* Apron and legs */}
       <mesh position={[0.62, PLAY.y - 0.07, 0]} castShadow receiveShadow>
