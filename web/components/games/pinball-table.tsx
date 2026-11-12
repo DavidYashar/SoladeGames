@@ -343,6 +343,19 @@ function Bumper({
   );
 }
 
+/** The amber plate traced from the artwork, one per arm corner. */
+function Slingshot({ side }: { side: 1 | -1 }) {
+  const { x, z, theta } = slingPlacement(side);
+  return (
+    <GltfPart
+      url="/models/pinball/slingshot.glb"
+      mapping={SLING_MAP}
+      position={[x, PLAY.y + 0.008, z]}
+      rotation={[0, theta, 0]}
+    />
+  );
+}
+
 const LANE_MAP = {
   Arm: PART_METAL,
   ArmRun: PART_METAL,
@@ -380,45 +393,53 @@ const SLING_MAP = {
 /** Where each plate sits: the inside corner of the L formed by its arm. */
 // Midpoint of the arm's diagonal, which runs from the elbow (0.232, +/-0.2595) to
 // the flipper pivot (0.34, +/-0.1395). The plate nests there.
-// The plates sit in the corner where each arm bends. The elbow is at (0.232, +/-0.2595)
-// and the plate is pulled 45 mm in toward the middle of the field.
-const SLING_POS: Record<1 | -1, [number, number]> = {
-  1: [0.2, 0.2276],
-  [-1]: [0.2, -0.1724],
-};
+// From the trace of the artwork:
+//   obtuse corner (94.7 deg) at (-0.040, -0.013), centroid at (-0.004, -0.003)
+//   longest side (118 mm) opposite it, midpoint at (0.012, 0.004)
+// The obtuse corner goes into the bend of the arm; the longest side faces the
+// middle of the field, slightly up-table.
+const SLING_CORNER = { x: -0.0367, z: 0.0099 }; // centroid -> obtuse corner
+const SLING_EDGE = { x: 0.0153, z: -0.0064 };   // centroid -> longest side midpoint
 
-// Direction of the plate's longest edge in its own coordinates, taken from the trace
-// of the artwork (centre of the outline -> midpoint of its longest side).
-const SLING_BROAD = { x: 0.92, z: 0.39 };
+/** Elbow of each arm, where the two runs meet. */
+const ELBOW = { x: 0.232, z: 0.2595 };
+const ELBOW_RIGHT = { x: 0.232, z: -0.2045 };
 
-const FIELD_CENTRE = { x: 0, z: M(0) };
+/** The point the longest side should face. */
+const SLING_AIM = { x: -0.05, z: M(0) };
 
-/** Aim the plate's broad side at the middle of the field. */
-function slingAngle(side: 1 | -1): number {
-  const [x, z] = SLING_POS[side];
-  const dx = FIELD_CENTRE.x - x;
-  const dz = FIELD_CENTRE.z - z;
-  const len = Math.hypot(dx, dz) || 1;
-  const tx = dx / len;
-  const tz = dz / len;
-  return Math.atan2(
-    SLING_BROAD.z * tx - SLING_BROAD.x * tz,
-    SLING_BROAD.x * tx + SLING_BROAD.z * tz,
-  );
+function rotate2(v: { x: number; z: number }, theta: number) {
+  const c = Math.cos(theta);
+  const s = Math.sin(theta);
+  return { x: v.x * c + v.z * s, z: -v.x * s + v.z * c };
 }
 
-/** The amber plate traced from the artwork, one per arm corner. */
-function Slingshot({ side }: { side: 1 | -1 }) {
-  const [x, z] = SLING_POS[side];
-  return (
-    <GltfPart
-      url="/models/pinball/slingshot.glb"
-      mapping={SLING_MAP}
-      position={[x, PLAY.y + 0.008, z]}
-      rotation={[0, slingAngle(side), 0]}
-    />
-  );
+function angleTo(from: { x: number; z: number }, to: { x: number; z: number }) {
+  return Math.atan2(from.z * to.x - from.x * to.z, from.x * to.x + from.z * to.z);
 }
+
+/**
+ * Solve for the placement: rotate so the longest side faces the aim point, then shift
+ * so the obtuse corner lands on the arm's elbow. Iterated because the aim direction
+ * depends on where the plate ends up.
+ */
+function slingPlacement(side: 1 | -1) {
+  const elbow = side > 0 ? ELBOW : ELBOW_RIGHT;
+  let pos = { x: elbow.x - 0.026, z: elbow.z - side * 0.026 };
+  let theta = 0;
+
+  for (let i = 0; i < 4; i += 1) {
+    const dx = SLING_AIM.x - pos.x;
+    const dz = SLING_AIM.z - pos.z;
+    const len = Math.hypot(dx, dz) || 1;
+    theta = angleTo(SLING_EDGE, { x: dx / len, z: dz / len });
+    const corner = rotate2(SLING_CORNER, theta);
+    pos = { x: elbow.x - corner.x, z: elbow.z - corner.z };
+  }
+
+  return { x: pos.x, z: pos.z, theta };
+}
+
 
 
 
