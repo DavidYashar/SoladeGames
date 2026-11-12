@@ -284,11 +284,12 @@ function Bumper({
   const cap = useRef<THREE.MeshStandardMaterial | null>(null);
 
   const object = useMemo(() => {
+    // A darker cap, so the white face and its number stand out.
     const capMaterial = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 1.5,
-      roughness: 0.22,
+      color: new THREE.Color(color).multiplyScalar(0.42),
+      emissive: new THREE.Color(color).multiplyScalar(0.5),
+      emissiveIntensity: 0.55,
+      roughness: 0.3,
       metalness: 0.25,
     });
     cap.current = capMaterial;
@@ -314,7 +315,7 @@ function Bumper({
     const struck = shared.flash[id] ?? 0;
     const since = (performance.now() - struck) / 1000;
     const level = since < 0.35 ? 1 - since / 0.35 : 0;
-    material.emissiveIntensity = 1.5 + level * 6;
+    material.emissiveIntensity = 0.55 + level * 5;
   });
 
   const face = useMemo(() => makeBellFace(value, color), [value, color]);
@@ -327,6 +328,28 @@ function Bumper({
         <meshBasicMaterial map={face} transparent toneMapped={false} />
       </mesh>
     </group>
+  );
+}
+
+const LANE_MAP = {
+  LaneWall: PART_METAL,
+  Lip: PART_CREAM,
+  Rivet0: PART_STEEL,
+  Rivet1: PART_STEEL,
+  Rivet2: PART_STEEL,
+  Rivet3: PART_STEEL,
+};
+
+/** The black curved guide that carries the ball down to a flipper. */
+function LaneWall({ side }: { side: 1 | -1 }) {
+  return (
+    <GltfPart
+      url="/models/pinball/lane_wall.glb"
+      mapping={LANE_MAP}
+      position={[0.19, PLAY.y + 0.006, M(side * 0.16)]}
+      rotation={[0, side > 0 ? 1.88 : -1.88, 0]}
+      scale={1.9}
+    />
   );
 }
 
@@ -345,7 +368,7 @@ function Slingshot({ side }: { side: 1 | -1 }) {
     <GltfPart
       url="/models/pinball/slingshot.glb"
       mapping={SLING_MAP}
-      position={[0.19, PLAY.y + 0.011, M(side * 0.163)]}
+      position={[0.085, PLAY.y + 0.011, M(side * 0.205)]}
       rotation={[0, side > 0 ? -0.32 : Math.PI + 0.32, 0]}
     />
   );
@@ -1167,41 +1190,8 @@ function Cabinet() {
       <Post x={0.3} z={M(0.2)} />
       <Post x={0.3} z={M(-0.2)} />
 
-      {/* Funnels, matching their colliders. */}
-      {[1, -1].map((side) => {
-        const pts: [number, number][] = [
-          // Upper end meets the side wall, so nothing can perch on the tip or slip
-          // behind it.
-          [0.04, side > 0 ? HALF_W - 0.012 : DIVIDER_Z + 0.008],
-          [0.2, M(side * 0.16)],
-          // Lower end lands on the flipper hinge.
-          [0.34, M(side * 0.112)],
-        ];
-        return pts.slice(0, -1).map(([x0, z0], i) => {
-          const [x1, z1] = pts[i + 1];
-          const dx = x1 - x0;
-          const dz = z1 - z0;
-          const len = Math.hypot(dx, dz);
-          return (
-            <group key={`fun${side}${i}`}>
-              <mesh
-                position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
-                rotation={[0, Math.atan2(-dz, dx), 0]}
-                castShadow
-              >
-                <boxGeometry args={[len, 0.04, 0.009]} />
-                <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-              </mesh>
-              {i === 0 ? (
-                <mesh position={[x0, PLAY.y + 0.02, z0]} castShadow>
-                  <cylinderGeometry args={[0.009, 0.009, 0.04, 16]} />
-                  <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-                </mesh>
-              ) : null}
-            </group>
-          );
-        });
-      })}
+      <LaneWall side={1} />
+      <LaneWall side={-1} />
 
       {/* Curved head, matching its colliders. */}
       {TOP_ARC.slice(0, -1).map(([x0, z0], i) => {
@@ -1279,6 +1269,7 @@ useGLTF.preload("/models/pinball/bumper.glb");
 useGLTF.preload("/models/pinball/flipper.glb");
 useGLTF.preload("/models/pinball/post.glb");
 useGLTF.preload("/models/pinball/slingshot.glb");
+useGLTF.preload("/models/pinball/lane_wall.glb");
 
 export function PinballTable() {
   const [score, setScore] = useState(0);

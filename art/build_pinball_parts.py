@@ -297,6 +297,92 @@ def build_slingshot() -> None:
     export("slingshot", [plate, border] + screws)
 
 
+
+
+# ---------------------------------------------------------------- lane wall
+def build_lane_wall() -> None:
+    """The black curved guide that carries the ball down to a flipper.
+
+    A ribbon swept along an arc, with a cream lip on top and rivets down the face.
+    Built along +X from its low end, so one rotation aims it.
+    """
+    clear()
+
+    radius = 0.17
+    half_angle = math.radians(26)
+    thickness = 0.011
+    height = 0.03
+    steps = 28
+
+    verts: list[tuple[float, float, float]] = []
+    for i in range(steps + 1):
+        a = -half_angle + (i / steps) * (half_angle * 2)
+        cx = radius * math.cos(a) - radius
+        cy = radius * math.sin(a)
+        nx = math.cos(a) * thickness
+        ny = math.sin(a) * thickness
+        for dz, sign in ((0.0, 1), (0.0, -1), (height, 1), (height, -1)):
+            verts.append((cx + sign * nx, cy + sign * ny, dz))
+
+    faces = []
+    for i in range(steps):
+        b = i * 4
+        n = (i + 1) * 4
+        faces.append((b + 0, b + 1, n + 1, n + 0))      # underside
+        faces.append((b + 2, n + 2, n + 3, b + 3))      # top
+        faces.append((b + 0, n + 0, n + 2, b + 2))      # outer
+        faces.append((b + 1, b + 3, n + 3, n + 1))      # inner
+    faces.append((0, 2, 3, 1))
+    last = steps * 4
+    faces.append((last + 0, last + 1, last + 3, last + 2))
+
+    mesh = bpy.data.meshes.new("LaneWall")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    wall = bpy.data.objects.new("LaneWall", mesh)
+    bpy.context.collection.objects.link(wall)
+    apply_bevel(wall, 0.0022, 3)
+
+    # Cream lip along the top.
+    lip_verts = []
+    for i in range(steps + 1):
+        a = -half_angle + (i / steps) * (half_angle * 2)
+        cx = radius * math.cos(a) - radius
+        cy = radius * math.sin(a)
+        nx = math.cos(a) * (thickness + 0.0015)
+        ny = math.sin(a) * (thickness + 0.0015)
+        for sign in (1, -1):
+            lip_verts.append((cx + sign * nx, cy + sign * ny, height + 0.0035))
+    lip_faces = [(i * 2, i * 2 + 1, (i + 1) * 2 + 1, (i + 1) * 2) for i in range(steps)]
+    lip_mesh = bpy.data.meshes.new("Lip")
+    lip_mesh.from_pydata(lip_verts, [], lip_faces)
+    lip_mesh.update()
+    lip = bpy.data.objects.new("Lip", lip_mesh)
+    bpy.context.collection.objects.link(lip)
+    apply_bevel(lip, 0.0015, 2)
+
+    rivets = []
+    for i in range(4):
+        a = -half_angle + ((i + 0.5) / 4) * (half_angle * 2)
+        cx = radius * math.cos(a) - radius
+        cy = radius * math.sin(a)
+        rivet = cylinder(f"Rivet{i}", 0.0032, 0.006, 0.0, verts=16)
+        rivet.location = (
+            cx + math.cos(a) * (thickness + 0.002),
+            cy + math.sin(a) * (thickness + 0.002),
+            height * 0.55,
+        )
+        rivet.rotation_euler = (math.radians(90), 0, a)
+        bpy.context.view_layer.objects.active = rivet
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
+        rivets.append(rivet)
+
+    for obj in [wall, lip] + rivets:
+        smooth(obj)
+
+    export("lane_wall", [wall, lip] + rivets)
+
+
 if __name__ == "__main__":
     print("building pinball parts")
     build_bumper()
@@ -305,4 +391,5 @@ if __name__ == "__main__":
     build_post()
     build_target()
     build_slingshot()
+    build_lane_wall()
     print("done")
