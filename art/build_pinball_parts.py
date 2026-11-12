@@ -254,7 +254,7 @@ def build_slingshot() -> None:
     """The big red triangle from the icon set: plate, cream border, three screws."""
     clear()
 
-    tri = [(0.0, 0.0), (0.115, 0.015), (0.03, 0.075)]
+    tri = [(0.0, 0.0), (0.115, 0.0), (0.035, 0.075)]
 
     mesh = bpy.data.meshes.new("TriangleProfile")
     mesh.from_pydata([(x, y, 0) for x, y in tri], [], [[0, 1, 2]])
@@ -270,7 +270,7 @@ def build_slingshot() -> None:
 
     border_mesh = bpy.data.meshes.new("BorderProfile")
     border_mesh.from_pydata(
-        [(x * 1.05 - 0.002, y * 1.05 - 0.002, 0) for x, y in tri], [], [[0, 1, 2]]
+        [(x * 1.04 - 0.0025, y * 1.05 - 0.002, 0) for x, y in tri], [], [[0, 1, 2]]
     )
     border_mesh.update()
     border = bpy.data.objects.new("Border", border_mesh)
@@ -283,7 +283,7 @@ def build_slingshot() -> None:
     apply_bevel(border, 0.005, 3)
 
     screws = []
-    for i, (sx, sy) in enumerate([(0.012, 0.010), (0.1, 0.02), (0.035, 0.066)]):
+    for i, (sx, sy) in enumerate([(0.022, 0.009), (0.058, 0.009), (0.094, 0.009)]):
         screw = cylinder(f"Screw{i}", 0.0055, 0.026, 0.0, verts=24)
         screw.location = (sx, sy, 0.0)
         bpy.context.view_layer.objects.active = screw
