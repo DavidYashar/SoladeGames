@@ -29,7 +29,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 DATA.parent.mkdir(parents=True, exist_ok=True)
 
 HALF_W = 0.27
-HALF_L = 0.04
+HALF_L = 0.54
 LANE_W = 0.055
 DIVIDER_Z = -HALF_W + 0.012 + LANE_W - 0.008
 CENTER_Z = (HALF_W - 0.012 + DIVIDER_Z + 0.008) / 2
@@ -37,7 +37,12 @@ M = lambda dz: CENTER_Z + dz
 
 DIVIDER_FROM = HALF_L - 0.1
 DIVIDER_TO = -0.22
-TOP_RAMP = (-0.368, -0.2)
+TOP_RAMP = (-0.378, -0.2)
+
+# Where the corridor's outer rail ends and the exit wall begins. One named point used
+# by both walls, so they stay fused instead of being computed separately.
+LANE_RAIL_Z = -HALF_W
+LANE_RAIL_END = (-0.31, LANE_RAIL_Z)
 
 WALL_H = 0.042
 WALL_W = 0.012
@@ -91,11 +96,6 @@ def segment(name: str, p0, p1, width: float, height: float, z0: float):
 
 
 def join(parts, name):
-    # A single-segment wall has nothing to join; calling the operator anyway prints
-    # "No mesh data to join" once per part.
-    if len(parts) == 1:
-        parts[0].name = name
-        return parts[0]
     bpy.ops.object.select_all(action="DESELECT")
     for p in parts:
         p.select_set(True)
@@ -152,12 +152,12 @@ def main() -> None:
         "outerLeft": [(-HALF_L, HALF_W), (HALF_L, HALF_W)],
         # Runs the full length so it meets the head arc: the lane wall used to stop
         # at x = 0.3 and left the right side of the field open.
-        "outerLane": [(HALF_L, -HALF_W), (-0.31, -HALF_W)],
+        "outerLane": [(HALF_L, LANE_RAIL_Z), LANE_RAIL_END],
         "outerNear": [(HALF_L, HALF_W), (HALF_L, -HALF_W)],
         # Internal.
         "divider": [(DIVIDER_FROM, DIVIDER_Z), (DIVIDER_TO, DIVIDER_Z)],
         "head": head_arc(),
-        "laneEnd": [(-0.3, -HALF_W + 0.012), TOP_RAMP],
+        "laneEnd": [LANE_RAIL_END, TOP_RAMP],
     }
 
     parts = []
