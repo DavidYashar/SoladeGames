@@ -56,7 +56,18 @@ const AMBER = "#ffd166";
 const BALL_R = 0.0135;
 
 /**
- * Bumper positions, from the layout sheets: three in a triangle across the upper
+ * The head of the table: a semicircle from the left rail round to the lane divider.
+ * A straight wall corners the ball and spits it back; a curve returns it to the field.
+ */
+const TOP_ARC: [number, number][] = Array.from(
+  { length: 13 },
+  (_, i): [number, number] => {
+    const a = Math.PI / 2 + (i / 12) * Math.PI;
+    return [-0.31 + 0.23 * Math.cos(a), M(0) + 0.23 * Math.sin(a)];
+  },
+);
+
+/** Bumper positions, from the layout sheets:
  * field, and two larger ones flanking the middle. Both the visuals and the colliders
  * read this list, so they cannot drift apart.
  */
@@ -479,8 +490,21 @@ function Pinball({
       // The lane's outer wall stops where the exit curve begins.
       box((HALF_L + 0.3) / 2, 0.012, (HALF_L - 0.3) / 2, -HALF_W, 0.5);
 
-      // The far wall is only behind the field; the lane exits through the curve.
-      box(0.012, HALF_W, -HALF_L, 0, 0.5);
+      // Curved head, instead of a flat far wall.
+      for (let i = 0; i < TOP_ARC.length - 1; i += 1) {
+        const [x0, z0] = TOP_ARC[i];
+        const [x1, z1] = TOP_ARC[i + 1];
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        const len = Math.hypot(dx, dz);
+        w.createCollider(
+          RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.008)
+            .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
+            .setRotation(quatFromY(Math.atan2(-dz, dx)))
+            .setFriction(0.04)
+            .setRestitution(0.55),
+        );
+      }
 
       // Corridor divider: the ball shoots up the right lane and leaves at the top.
       box((DIVIDER_FROM - DIVIDER_TO) / 2, 0.008, (DIVIDER_FROM + DIVIDER_TO) / 2, DIVIDER_Z, 0.3);
@@ -509,8 +533,8 @@ function Pinball({
         const pts: [number, number][] = [
           // Upper tip stands clear of the side wall, so a ball that gets in there
           // can pass through rather than being trapped.
-          [0.08, M(side * 0.17)],
-          [0.2, M(side * 0.145)],
+          [0.08, M(side * 0.2)],
+          [0.2, M(side * 0.16)],
           // Lower end lands on the flipper hinge: no gap for the ball to slip into.
           [0.34, M(side * 0.112)],
         ];
@@ -992,8 +1016,8 @@ function Cabinet() {
         const pts: [number, number][] = [
           // Upper tip stands clear of the side wall, so a ball that gets in there
           // can pass through rather than being trapped.
-          [0.08, M(side * 0.17)],
-          [0.2, M(side * 0.145)],
+          [0.08, M(side * 0.2)],
+          [0.2, M(side * 0.16)],
           // Lower end lands on the flipper hinge: no gap for the ball to slip into.
           [0.34, M(side * 0.112)],
         ];
@@ -1021,6 +1045,25 @@ function Cabinet() {
             </group>
           );
         });
+      })}
+
+      {/* Curved head, matching its colliders. */}
+      {TOP_ARC.slice(0, -1).map(([x0, z0], i) => {
+        const [x1, z1] = TOP_ARC[i + 1];
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        const len = Math.hypot(dx, dz);
+        return (
+          <mesh
+            key={`head${i}`}
+            position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
+            rotation={[0, Math.atan2(-dz, dx), 0]}
+            castShadow
+          >
+            <boxGeometry args={[len, 0.04, 0.012]} />
+            <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+          </mesh>
+        );
       })}
 
       {/* Top arch with a saucer behind it. */}
