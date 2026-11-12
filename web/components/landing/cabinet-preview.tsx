@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Accent = "sky" | "ocean" | "ice" | "indigo";
-type Kind = "tower" | "brick" | "bubble" | "pinball";
+type Kind = "tower" | "brick" | "pinball";
 
 interface CabinetProps {
   name: string;
@@ -80,30 +80,6 @@ function BrickScene() {
   );
 }
 
-function BubbleScene() {
-  const rows = [
-    ["#8fc0e8", "#a9d4f0", "#c9e2f5", "#7fb3d9", "#8fc0e8", "#a9d4f0"],
-    ["#c9e2f5", "#7fb3d9", "#8fc0e8", "#a9d4f0", "#c9e2f5"],
-    ["#8fc0e8", "#c9e2f5", "#7fb3d9", "#8fc0e8"],
-    ["#a9d4f0", "#8fc0e8", "#c9e2f5"],
-  ];
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-1.5 px-2">
-      {rows.map((row, r) => (
-        <div key={r} className="flex gap-1.5">
-          {row.map((c, i) => (
-            <span
-              key={i}
-              className="h-6 w-6 rounded-full"
-              style={{ background: c, boxShadow: `0 0 8px ${c}` }}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function PinballScene() {
   return (
     <div className="relative h-full overflow-hidden">
@@ -153,7 +129,6 @@ export function CabinetPreview({
         <div className="aspect-[4/5] overflow-hidden rounded-sm bg-[#05050f]">
           {kind === "tower" && <TowerScene />}
           {kind === "brick" && <BrickScene />}
-          {kind === "bubble" && <BubbleScene />}
           {kind === "pinball" && <PinballScene />}
         </div>
       </div>

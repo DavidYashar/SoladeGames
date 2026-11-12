@@ -8,7 +8,7 @@ interface CabinetEntry {
   route?: string;
   control: string;
   accent: "sky" | "ocean" | "ice" | "indigo";
-  kind: "tower" | "brick" | "bubble" | "pinball";
+  kind: "tower" | "brick" | "pinball";
   bestKey: string;
 }
 
@@ -28,13 +28,6 @@ const CABINETS: CabinetEntry[] = [
     accent: "ocean",
     kind: "brick",
     bestKey: "imarket:brick-blitz:best",
-  },
-  {
-    name: "Bubble Pop",
-    control: "Aim · shoot · chain",
-    accent: "ice",
-    kind: "bubble",
-    bestKey: "imarket:bubble-pop:best",
   },
   {
     name: "Neon Pinball",
@@ -76,7 +69,7 @@ export function HallHero() {
         <h2 className="font-display text-[11px] uppercase tracking-[0.25em] text-zinc-500">
           The hall
         </h2>
-        <p className="text-xs text-zinc-600">Two cabinets live · two in the works</p>
+        <p className="text-xs text-zinc-600">Two cabinets live · one in the works</p>
       </div>
 
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible lg:grid-cols-4">

@@ -14,8 +14,8 @@ const STATS = [
   },
   {
     label: "Machines live",
-    value: "4",
-    sub: "Tower · Brick · Bubble · Pinball",
+    value: "3",
+    sub: "Tower · Brick · Pinball",
     accent: "text-emerald-300",
   },
   {

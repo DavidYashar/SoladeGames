@@ -16,7 +16,6 @@ import { SOLANA_CLUSTER } from "@/lib/solana";
 const BEST_KEYS = [
   { label: "Stack Tower", key: "imarket:stack-tower:best" },
   { label: "Brick Blitz", key: "imarket:brick-blitz:best" },
-  { label: "Bubble Pop", key: "imarket:bubble-pop:best" },
   { label: "Neon Pinball", key: "imarket:pinball:best" },
 ] as const;
 

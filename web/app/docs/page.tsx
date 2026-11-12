@@ -18,12 +18,6 @@ const GAMES = [
     identity: "Waves, survival & power-ups",
   },
   {
-    name: "Bubble Pop",
-    machine: "Bubble Machine",
-    desc: "Aim, shoot, chain pops — the king of one more round.",
-    identity: "Efficiency & chain reactions",
-  },
-  {
     name: "Neon Pinball",
     machine: "Pinball Machine",
     desc: "Real physics: flippers, bumpers, spin, and a plunger.",
@@ -40,7 +34,6 @@ const MONEY = [
 const MACHINES = [
   { name: "Tower Machine", game: "Stack Tower", identity: "Precision & timing" },
   { name: "Brick Machine", game: "Brick Blitz", identity: "Waves, survival & power-ups" },
-  { name: "Bubble Machine", game: "Bubble Pop", identity: "Efficiency & chain reactions" },
   { name: "Pinball Machine", game: "Neon Pinball", identity: "Momentum, physics & combo mastery" },
 ] as const;
 

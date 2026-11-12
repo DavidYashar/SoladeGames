@@ -2,7 +2,7 @@
 const FEED = [
   { id: 1, icon: "🎰", text: "A machine owner just earned rewards", time: "—" },
   { id: 2, icon: "🏆", text: "A player entered a daily tournament", time: "—" },
-  { id: 3, icon: "🫧", text: "Bubble Pop round completed on-chain", time: "—" },
+  { id: 3, icon: "🫧", text: "Neon Pinball round completed on-chain", time: "—" },
   { id: 4, icon: "🧩", text: "Daily puzzle league winner claimed USDC", time: "—" },
 ] as const;
 
