@@ -344,10 +344,12 @@ function Bumper({
 }
 
 const LANE_MAP = {
-  Casing: PART_CREAM,
-  Frame: PART_DARK,
-  ArmFace: PART_METAL,
-  PlateFace: PART_AMBER,
+  Arm: PART_METAL,
+  ArmRun: PART_METAL,
+  ArmElbow: PART_METAL,
+  Border: PART_CREAM,
+  BorderRun: PART_CREAM,
+  BorderElbow: PART_CREAM,
   Hinge: PART_CREAM,
   Screw: PART_STEEL,
 };
@@ -383,7 +385,18 @@ const SLING_POS: Record<1 | -1, [number, number]> = {
 };
 
 /** The red triangle from the icon set: a kicker beside each flipper. */
-
+function Slingshot({ side }: { side: 1 | -1 }) {
+  const [x, z] = SLING_POS[side];
+  return (
+    <GltfPart
+      url="/models/pinball/slingshot.glb"
+      mapping={SLING_MAP}
+      position={[x, PLAY.y + 0.008, z]}
+      // Point at the elbow, long axis following the diagonal of the arm.
+      rotation={[0, side > 0 ? 2.4 : 0.73, 0]}
+    />
+  );
+}
 
 
 
@@ -1282,6 +1295,8 @@ function Cabinet() {
       <Spinner x={-0.1} z={M(-0.185)} />
 
       <PlungerSpring />
+      <Slingshot side={1} />
+      <Slingshot side={-1} />
       <Post x={0.3} z={M(0.2)} />
       <Post x={0.3} z={M(-0.2)} />
 
