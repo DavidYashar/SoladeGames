@@ -578,8 +578,8 @@ function Pinball({
       BUMPERS.forEach((b) => {
         const z = M(b.dz);
         const c = w.createCollider(
-          RAPIER.ColliderDesc.cylinder(0.032, 0.03)
-            .setTranslation(b.x, PLAY.y + 0.032, z)
+          RAPIER.ColliderDesc.ball(0.034)
+            .setTranslation(b.x, PLAY.y + 0.034, z)
             .setFriction(0.02)
             .setRestitution(0.9),
         );
@@ -712,6 +712,14 @@ function Pinball({
           }
         });
         return { ball: { x: Number(bt.x.toFixed(3)), z: Number(bt.z.toFixed(3)) }, near: out };
+      };
+      (window as unknown as { __place?: (x: number, z: number) => void }).__place = (
+        x: number,
+        z: number,
+      ) => {
+        mode.current = "play";
+        ball.setTranslation({ x, y: PLAY.y + 0.03, z }, true);
+        ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
       };
       (window as unknown as { __kick?: (vx: number, vz: number) => void }).__kick = (
         vx: number,
@@ -883,16 +891,20 @@ function Pinball({
           const t = ball.translation();
           const dx = t.x - bumper.x;
           const dz = t.z - bumper.z;
-          const len = Math.hypot(dx, dz) || 1;
+          const len = Math.hypot(dx, dz);
+          // Directly above the centre there is no radial direction to use, so fall
+          // back to a fixed one; otherwise the ball just sits there.
+          const dir =
+            len > 0.004
+              ? { x: dx / len, z: dz / len }
+              : { x: 0.6, z: t.z >= bumper.z ? 0.8 : -0.8 };
           const v = ball.linvel();
-          const kicked = {
-            x: v.x + (dx / len) * 2.6,
-            y: 0,
-            z: v.z + (dz / len) * 2.6,
-          };
-          const speed = Math.hypot(kicked.x, kicked.z);
-          const scale = Math.min(6.2, Math.max(2.4, speed)) / (speed || 1);
-          ball.setLinvel({ x: kicked.x * scale, y: 0, z: kicked.z * scale }, true);
+          const incoming = Math.hypot(v.x, v.z);
+          const outSpeed = Math.min(6.5, Math.max(2.8, incoming * 0.85 + 2.2));
+          ball.setLinvel(
+            { x: dir.x * outSpeed, y: 0.35, z: dir.z * outSpeed },
+            true,
+          );
         }
       });
     }
