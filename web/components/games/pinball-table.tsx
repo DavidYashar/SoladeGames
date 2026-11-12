@@ -24,17 +24,17 @@ const PLAY = { w: 0.54, l: 1.08, y: 0.85 };
 const HALF_W = PLAY.w / 2;
 const HALF_L = PLAY.l / 2;
 
-const CORRIDOR_Z = -HALF_W + 0.026;
-const DIVIDER_Z = -HALF_W + 0.058;
+const CORRIDOR_Z = -HALF_W + 0.052;
+const DIVIDER_Z = -HALF_W + 0.092;
 const DIVIDER_FROM = HALF_L - 0.1;
 const DIVIDER_TO = -0.3;
 
 /** The corridor exit, drawn and collided from the same points. */
 const CIRCUIT: [number, number][] = [
-  [-0.34, -HALF_W + 0.004],
-  [-0.42, -0.232],
-  [-0.458, -0.16],
-  [-0.468, -0.075],
+  // A single deflector across the top of the lane, angled 45 degrees so the ball is
+  // turned out into the playfield instead of bouncing straight back down.
+  [-0.33, -0.248],
+  [-0.405, -0.168],
 ];
 
 const RAIL = 0.05;
@@ -46,6 +46,11 @@ const NEON_VIOLET = "#a06bff";
 const AMBER = "#ffd166";
 
 const BALL_R = 0.0135;
+const PLUNGER_X = HALF_L - 0.085;
+
+/** Flipper geometry in radians. Each bat sweeps exactly 30 degrees and comes back. */
+const FLIP_REST = 0.785;
+const FLIP_SWING = 0.524;
 const DOWNHILL = 1.5;
 
 const FLIPPER = { len: 0.112, thick: 0.014, width: 0.03 };
@@ -328,10 +333,14 @@ function Pinball({
   const scoring = useRef<Record<number, number>>({});
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
+  const mode = useRef<"idle" | "play">("idle");
+  const flip = useRef({
+    left: FLIP_REST,
+    right: -FLIP_REST,
+    leftTarget: FLIP_REST,
+    rightTarget: -FLIP_REST,
+  });
 
-  const FLIP_REST = 0.42;
-  const FLIP_PRESS = -0.5;
-  const FLIP_SPEED = 9;
 
   useEffect(() => {
     let cancelled = false;
@@ -445,8 +454,8 @@ function Pinball({
       };
       ring(-0.02, 0, 0.13, 12);
       // Outlane posts.
-      box(0.008, 0.008, 0.3, 0.2, 0.6);
-      box(0.008, 0.008, 0.3, -0.2, 0.6);
+      box(0.008, 0.008, 0.3, 0.15, 0.6);
+      box(0.008, 0.008, 0.3, -0.145, 0.6);
 
       // Flippers: kinematic, so a rotation drags the ball rather than teleporting it.
       const makeFlipper = (side: 1 | -1) => {
@@ -473,7 +482,7 @@ function Pinball({
       // Ball: starts in the corridor, held until the plunger fires.
       const ball = w.createRigidBody(
         RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(HALF_L - 0.06, PLAY.y + BALL_R + 0.02, CORRIDOR_Z)
+          .setTranslation(PLUNGER_X, PLAY.y + BALL_R + 0.02, CORRIDOR_Z)
           .setLinearDamping(0.04)
           .setAngularDamping(0.4)
           .setCcdEnabled(true),
@@ -495,10 +504,68 @@ function Pinball({
       world.current = w;
       events.current = new RAPIER.EventQueue(true);
       shared.ball = ball;
+      const ballColliderRef = ballCollider;
+      (window as unknown as { __flip?: () => unknown }).__flip = () => ({
+        left: Number(flip.current.left.toFixed(3)),
+        right: Number(flip.current.right.toFixed(3)),
+      });
+      (window as unknown as { __at?: (x: number, y: number, z: number) => unknown }).__at = (
+        x: number,
+        y: number,
+        z: number,
+      ) => {
+        const hits: { h: number; x: number; y: number; z: number }[] = [];
+        w.intersectionsWithPoint({ x, y, z }, (c) => {
+          const tr = c.translation();
+          hits.push({
+            h: c.handle,
+            x: Number(tr.x.toFixed(3)),
+            y: Number(tr.y.toFixed(3)),
+            z: Number(tr.z.toFixed(3)),
+          });
+        });
+        return hits;
+      };
+      (window as unknown as { __ghost?: (on: boolean) => void }).__ghost = (on: boolean) => {
+        ballColliderRef.setSensor(on);
+      };
+      (window as unknown as { __near?: () => unknown }).__near = () => {
+        const bt = ball.translation();
+        const out: { h: number; x: number; z: number; shape: string }[] = [];
+        w.forEachCollider((c) => {
+          const tr = c.translation();
+          const d = Math.hypot(tr.x - bt.x, tr.z - bt.z);
+          if (d < 0.09) {
+            out.push({
+              h: c.handle,
+              x: Number(tr.x.toFixed(3)),
+              z: Number(tr.z.toFixed(3)),
+              shape: String(c.shape.type),
+            });
+          }
+        });
+        return { ball: { x: Number(bt.x.toFixed(3)), z: Number(bt.z.toFixed(3)) }, near: out };
+      };
+      (window as unknown as { __kick?: (vx: number, vz: number) => void }).__kick = (
+        vx: number,
+        vz: number,
+      ) => {
+        mode.current = "play";
+        ball.setLinvel({ x: vx, y: 0, z: vz }, true);
+      };
       (window as unknown as { __pin?: () => unknown }).__pin = () => {
         const tr = ball.translation();
         const v = ball.linvel();
-        return { x: tr.x, y: tr.y, z: tr.z, vx: v.x, vz: v.z, charge: shared.charge };
+        return {
+          x: tr.x,
+          y: tr.y,
+          z: tr.z,
+          vx: v.x,
+          vz: v.z,
+          charge: shared.charge,
+          mode: mode.current,
+          held: shared.plungerHeld,
+        };
       };
       shared.onScore = onScore;
       setReady(true);
@@ -507,35 +574,37 @@ function Pinball({
       const down = (e: KeyboardEvent) => {
         if (e.code === "Space") {
           e.preventDefault();
-          shared.plungerHeld = true;
+          if (mode.current === "idle") shared.plungerHeld = true;
           return;
         }
         if (e.code === "ArrowLeft" || e.code === "KeyA") {
-          leftBody.current?.setNextKinematicRotation(quatFromY(FLIP_PRESS * 1.55), true);
+          flip.current.leftTarget = FLIP_REST + FLIP_SWING;
         }
         if (e.code === "ArrowRight" || e.code === "KeyD") {
-          rightBody.current?.setNextKinematicRotation(quatFromY(FLIP_PRESS * 1.55), true);
+          flip.current.rightTarget = -FLIP_REST - FLIP_SWING;
         }
       };
       const up = (e: KeyboardEvent) => {
         if (e.code === "Space") {
+          e.preventDefault();
+          if (mode.current !== "idle" || !shared.plungerHeld) return;
           shared.plungerHeld = false;
-          // Fire along the lane: charge 0..1 maps onto 1.5..5.6 m/s.
-          const speed = 1.5 + shared.charge * 4.1;
-          ball.setTranslation(
-            { x: HALF_L - 0.06, y: PLAY.y + BALL_R + 0.02, z: CORRIDOR_Z },
-            true,
-          );
+          mode.current = "play";
+          (window as unknown as { __fires?: number }).__fires =
+            ((window as unknown as { __fires?: number }).__fires ?? 0) + 1;
+          // Charge 0..1 maps onto 1.6..5.4 m/s.
+          const speed = 1.6 + shared.charge * 3.8;
           ball.setLinvel({ x: -speed, y: 0, z: 0 }, true);
+          (window as unknown as { __fireVel?: unknown }).__fireVel = ball.linvel();
           shared.charge = 0;
           onCharge(0);
           return;
         }
         if (e.code === "ArrowLeft" || e.code === "KeyA") {
-          leftBody.current?.setNextKinematicRotation(quatFromY(FLIP_REST), true);
+          flip.current.leftTarget = FLIP_REST;
         }
         if (e.code === "ArrowRight" || e.code === "KeyD") {
-          rightBody.current?.setNextKinematicRotation(quatFromY(-FLIP_REST), true);
+          flip.current.rightTarget = -FLIP_REST;
         }
       };
 
@@ -563,7 +632,7 @@ function Pinball({
     const ball = shared.ball;
     if (!ball) return;
     ball.setTranslation(
-      { x: HALF_L - 0.06, y: PLAY.y + BALL_R + 0.02, z: CORRIDOR_Z },
+      { x: PLUNGER_X, y: PLAY.y + BALL_R + 0.02, z: CORRIDOR_Z },
       true,
     );
     ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -577,20 +646,36 @@ function Pinball({
     const ball = shared.ball;
     if (!w || !ball) return;
 
-    if (shared.plungerHeld) {
+    if (shared.plungerHeld && mode.current === "idle") {
       shared.charge = Math.min(1, shared.charge + delta / 1.1);
       onCharge(shared.charge);
     }
 
-    // Keep the flippers where the scene should draw them.
-    if (leftFlip.current && leftBody.current) {
-      const r = leftBody.current.rotation();
-      leftFlip.current.quaternion.set(r.x, r.y, r.z, r.w);
+    // Rest the ball against the plunger while the lane is loaded.
+    if (mode.current === "idle") {
+      ball.setTranslation(
+        { x: PLUNGER_X + shared.charge * 0.016, y: PLAY.y + BALL_R + 0.02, z: CORRIDOR_Z },
+        true,
+      );
+      ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      ball.setAngvel({ x: 0, y: 0, z: 0 }, true);
     }
-    if (rightFlip.current && rightBody.current) {
-      const r = rightBody.current.rotation();
-      rightFlip.current.quaternion.set(r.x, r.y, r.z, r.w);
-    }
+
+    // Sweep each flipper toward its target at a fixed rate, so the bat has a real
+    // speed instead of snapping through the ball.
+    const swing = 16 * delta;
+    const f = flip.current;
+    const step = (current: number, target: number) => {
+      if (Math.abs(target - current) <= swing) return target;
+      return current + Math.sign(target - current) * swing;
+    };
+    f.left = step(f.left, f.leftTarget);
+    f.right = step(f.right, f.rightTarget);
+    leftBody.current?.setNextKinematicRotation(quatFromY(f.left), true);
+    rightBody.current?.setNextKinematicRotation(quatFromY(f.right), true);
+
+    if (leftFlip.current) leftFlip.current.rotation.y = f.left;
+    if (rightFlip.current) rightFlip.current.rotation.y = f.right;
 
     acc.current += Math.min(delta, 0.05);
     let steps = 0;
@@ -619,11 +704,15 @@ function Pinball({
       ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
     }
 
-    // Drained: past the flippers and in the field, or under the playfield.
-    if (t.y < PLAY.y - 0.08 || (t.x > 0.44 && t.z > DIVIDER_Z + 0.01)) resetBall();
-    // Stalled somewhere it should not be.
-    const v = ball.linvel();
-    if (Math.hypot(v.x, v.z) < 0.03 && t.x > 0.2 && !shared.plungerHeld) resetBall();
+    // Drained: past the flippers into the field, or under the playfield.
+    if (mode.current === "play") {
+      if (t.y < PLAY.y - 0.08 || (t.x > 0.45 && t.z > DIVIDER_Z + 0.012)) {
+        mode.current = "idle";
+        shared.charge = 0;
+        onCharge(0);
+        resetBall();
+      }
+    }
   });
 
   return (
@@ -718,8 +807,8 @@ function Cabinet() {
       <Slingshot side={1} />
       <Slingshot side={-1} />
 
-      <Post x={0.3} z={0.2} />
-      <Post x={0.3} z={-0.2} />
+      <Post x={0.3} z={0.15} />
+      <Post x={0.3} z={-0.145} />
 
       {CIRCUIT.slice(0, -1).map(([x0, z0], i) => {
         const [x1, z1] = CIRCUIT[i + 1];
