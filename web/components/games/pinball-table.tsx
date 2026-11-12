@@ -46,7 +46,7 @@ const NEON_VIOLET = "#a06bff";
 const AMBER = "#ffd166";
 
 const BALL_R = 0.0135;
-const PLUNGER_X = HALF_L - 0.085;
+const PLUNGER_X = HALF_L - 0.115;
 
 /** Flipper geometry in radians. Each bat sweeps exactly 30 degrees and comes back. */
 const FLIP_REST = 0.785;
@@ -211,6 +211,33 @@ function FlipperMesh({ side }: { side: 1 | -1 }) {
       <mesh position={[FLIPPER.len - 0.03, 0, -0.0035]}>
         <boxGeometry args={[0.008, 0.004, 0.001]} />
         <meshBasicMaterial color={side > 0 ? NEON : NEON_VIOLET} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/** The plunger: a spring and shooter rod at the bottom of the lane. */
+function PlungerSpring() {
+  const spring = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    // Draw the spring back as the player charges, so the pull is visible.
+    if (!spring.current) return;
+    spring.current.position.x = 0.472 + shared.charge * 0.02;
+    spring.current.scale.x = 1 - shared.charge * 0.32;
+  });
+
+  return (
+    <group ref={spring} position={[0.472, PLAY.y + 0.014, CORRIDOR_Z]}>
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        <mesh key={i} position={[-0.03 + i * 0.009, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[0.012, 0.0022, 8, 18]} />
+          <meshStandardMaterial color="#b9c0c9" roughness={0.3} metalness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0.04, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.005, 0.005, 0.06, 12]} />
+        <meshStandardMaterial color="#dfe4ea" roughness={0.25} metalness={1} />
       </mesh>
     </group>
   );
@@ -807,6 +834,7 @@ function Cabinet() {
       <Slingshot side={1} />
       <Slingshot side={-1} />
 
+      <PlungerSpring />
       <Post x={0.3} z={0.15} />
       <Post x={0.3} z={-0.145} />
 
