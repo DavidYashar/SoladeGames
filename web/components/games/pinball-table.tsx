@@ -112,6 +112,8 @@ const PART_WALL_EDGE = new THREE.MeshStandardMaterial({
   color: "#191d24",
   roughness: 0.18,
   metalness: 0.88,
+  emissive: new THREE.Color("#4fc8ff"),
+  emissiveIntensity: 0.55,
 });
 const PART_METAL = new THREE.MeshStandardMaterial({
   color: "#252a31",
@@ -1407,6 +1409,22 @@ function Cabinet() {
 
       <LaneWall side={1} />
       <LaneWall side={-1} />
+
+      {/* Light riding the walls, spilling onto the playfield. */}
+      <pointLight
+        position={[-0.31, PLAY.y + 0.05, M(0)]}
+        color="#7fd8ff"
+        intensity={0.9}
+        distance={0.45}
+        decay={2}
+      />
+      <pointLight
+        position={[(DIVIDER_FROM + DIVIDER_TO) / 2, PLAY.y + 0.05, DIVIDER_Z]}
+        color="#7fd8ff"
+        intensity={0.7}
+        distance={0.4}
+        decay={2}
+      />
 
       <TableWalls />
 
