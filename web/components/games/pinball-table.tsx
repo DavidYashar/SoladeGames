@@ -452,26 +452,30 @@ function Pinball({
         );
       }
 
-      // Inlane guides: two angled walls that funnel the ball toward the flippers
-      // instead of letting it leak out of the bottom corners.
-      const guide = (side: 1 | -1) => {
-        const x0 = 0.5;
-        const z0 = M(side * 0.2);
-        const x1 = 0.3;
-        const z1 = M(side * 0.088);
-        const dx = x1 - x0;
-        const dz = z1 - z0;
-        const len = Math.hypot(dx, dz);
-        w.createCollider(
-          RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.007)
-            .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
-            .setRotation(quatFromY(Math.atan2(-dz, dx)))
-            .setFriction(0.1)
-            .setRestitution(0.5),
-        );
-      };
-      guide(1);
-      guide(-1);
+      // Funnels: two walls per side running from the side rail down to the flipper
+      // pivot. Anything coming down the side is delivered onto a flipper, which is
+      // what keeps the ball alive.
+      for (const side of [1, -1] as const) {
+        const pts: [number, number][] = [
+          [0.04, M(side * 0.21)],
+          [0.19, M(side * 0.175)],
+          [0.33, M(side * 0.125)],
+        ];
+        for (let i = 0; i < pts.length - 1; i += 1) {
+          const [x0, z0] = pts[i];
+          const [x1, z1] = pts[i + 1];
+          const dx = x1 - x0;
+          const dz = z1 - z0;
+          const len = Math.hypot(dx, dz);
+          w.createCollider(
+            RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.007)
+              .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
+              .setRotation(quatFromY(Math.atan2(-dz, dx)))
+              .setFriction(0.05)
+              .setRestitution(0.35),
+          );
+        }
+      }
 
       // Bumpers: three large, as in the layout, plus the top one.
       const bumperAt = (x: number, z: number) => {
@@ -488,20 +492,6 @@ function Pinball({
       bumperAt(-0.27, M(0));
       bumperAt(-0.33, M(-0.145));
       bumperAt(-0.33, M(0.145));
-
-      // Slingshots.
-      const sling = (side: 1 | -1) => {
-        const c = w.createCollider(
-          RAPIER.ColliderDesc.cuboid(0.06, 0.03, 0.012)
-            .setTranslation(0.16, PLAY.y + 0.03, M(side * 0.13))
-            .setRotation(quatFromY(side * -0.5))
-            .setFriction(0.05)
-            .setRestitution(1.2),
-        );
-        scoring.current[c.handle] = 25;
-      };
-      sling(1);
-      sling(-1);
 
       // Drop targets: a diamond of six in the middle of the field.
       for (const [tx, tz] of [
@@ -530,9 +520,6 @@ function Pinball({
       };
       ring(-0.02, M(0), 0.13, 12);
       ring(-0.27, M(0), 0.075, 8);
-      // Outlane posts, just outside the flipper tips.
-      box(0.008, 0.008, 0.34, M(0.16), 0.6);
-      box(0.008, 0.008, 0.34, M(-0.155), 0.6);
 
       // Saucer behind the top arch: catches the ball and kicks it back out.
       const saucer = w.createCollider(
@@ -905,35 +892,34 @@ function Cabinet() {
       <Spinner x={-0.1} z={M(0.185)} />
       <Spinner x={-0.1} z={M(-0.185)} />
 
-      <Slingshot side={1} />
-      <Slingshot side={-1} />
-
       <PlungerSpring />
-      <Post x={0.34} z={M(0.16)} />
-      <Post x={0.34} z={M(-0.155)} />
-      <Post x={0.44} z={M(0.2)} />
-      <Post x={0.44} z={M(-0.2)} />
+      <Post x={0.3} z={M(0.2)} />
+      <Post x={0.3} z={M(-0.2)} />
 
-      {/* Inlane guides, matching their colliders. */}
-      {[-1, 1].map((side) => {
-        const x0 = 0.5;
-        const z0 = M(side * 0.2);
-        const x1 = 0.3;
-        const z1 = M(side * 0.088);
-        const dx = x1 - x0;
-        const dz = z1 - z0;
-        const len = Math.hypot(dx, dz);
-        return (
-          <mesh
-            key={`guide${side}`}
-            position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
-            rotation={[0, Math.atan2(-dz, dx), 0]}
-            castShadow
-          >
-            <boxGeometry args={[len, 0.04, 0.01]} />
-            <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-          </mesh>
-        );
+      {/* Funnels, matching their colliders. */}
+      {[1, -1].map((side) => {
+        const pts: [number, number][] = [
+          [0.04, M(side * 0.21)],
+          [0.19, M(side * 0.175)],
+          [0.33, M(side * 0.125)],
+        ];
+        return pts.slice(0, -1).map(([x0, z0], i) => {
+          const [x1, z1] = pts[i + 1];
+          const dx = x1 - x0;
+          const dz = z1 - z0;
+          const len = Math.hypot(dx, dz);
+          return (
+            <mesh
+              key={`fun${side}${i}`}
+              position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
+              rotation={[0, Math.atan2(-dz, dx), 0]}
+              castShadow
+            >
+              <boxGeometry args={[len, 0.04, 0.009]} />
+              <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
+            </mesh>
+          );
+        });
       })}
 
       {/* Top arch with a saucer behind it. */}
