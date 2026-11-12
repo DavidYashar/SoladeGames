@@ -37,15 +37,17 @@ const DIVIDER_Z = -HALF_W + 0.012 + LANE_W - 0.008;
 const CENTER_Z = (HALF_W - 0.012 + DIVIDER_Z + 0.008) / 2;
 const M = (dz: number) => CENTER_Z + dz;
 const DIVIDER_FROM = HALF_L - 0.1;
-const DIVIDER_TO = -0.3;
+const DIVIDER_TO = -0.22;
 
 /** The corridor exit, drawn and collided from the same points. */
-const CIRCUIT: [number, number][] = [
-  // A single deflector across the top of the lane, angled 45 degrees so the ball is
-  // turned out into the playfield instead of bouncing straight back down.
-  [-0.33, -0.248],
-  [-0.405, -0.168],
-];
+const CIRCUIT: [number, number][] = Array.from(
+  { length: 9 },
+  (_, i): [number, number] => {
+    // Quarter turn from the lane's outer wall round into the playfield.
+    const a = Math.PI * 1.5 - (i / 8) * (Math.PI / 2);
+    return [-0.22 + 0.218 * Math.cos(a), -0.04 + 0.218 * Math.sin(a)];
+  },
+);
 
 const RAIL = 0.05;
 const RAIL_H = 0.055;
@@ -63,7 +65,7 @@ const FLIP_REST = 0.785;
 const FLIP_SWING = 0.524;
 const DOWNHILL = 1.5;
 
-const FLIPPER = { len: 0.112, thick: 0.014, width: 0.03 };
+const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
 
 const shared = {
   ball: null as RAPIER.RigidBody | null,
@@ -425,10 +427,14 @@ function Pinball({
       };
 
       // Outer walls.
-      box(HALF_L, 0.012, 0, HALF_W, 0.5);
-      box(HALF_L, 0.012, 0, -HALF_W, 0.5);
-      box(0.012, HALF_W, HALF_L, 0, 0.5);
-      box(0.012, HALF_W, -HALF_L, 0, 0.5);
+      box(HALF_L, 0.012, 0, HALF_W, 0.5); // left wall
+      box(0.012, HALF_W, HALF_L, 0, 0.5); // near wall, behind the plunger
+
+      // The lane's outer wall stops where the exit curve begins.
+      box((HALF_L + 0.22) / 2, 0.012, (HALF_L - 0.22) / 2, -HALF_W, 0.5);
+
+      // The far wall is only behind the field; the lane exits through the curve.
+      box(0.012, (HALF_W + 0.04) / 2, -HALF_L, (HALF_W - 0.04) / 2, 0.5);
 
       // Corridor divider: the ball shoots up the right lane and leaves at the top.
       box((DIVIDER_FROM - DIVIDER_TO) / 2, 0.008, (DIVIDER_FROM + DIVIDER_TO) / 2, DIVIDER_Z, 0.3);
@@ -546,7 +552,7 @@ function Pinball({
           RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
             0.34,
             PLAY.y + 0.02,
-            M(side * 0.062),
+            M(side * 0.112),
           ),
         );
         w.createCollider(
@@ -787,12 +793,36 @@ function Pinball({
       ballMesh.current.quaternion.set(r.x, r.y, r.z, r.w);
     }
 
-    // One-way gate at the top of the lane: once the ball reaches the end of the
-    // corridor it is pushed out into the playfield, as a real table's gate does.
-    if (mode.current === "play" && t.x < DIVIDER_TO - 0.015 && t.z < DIVIDER_Z) {
-      const v = ball.linvel();
-      const speed = Math.max(1.6, Math.hypot(v.x, v.z));
-      ball.setLinvel({ x: -0.35 * speed, y: 0, z: 0.94 * speed }, true);
+    // Inside the exit curve the wall is bending, so the ball follows it round. The
+    // segmented collider reflects a fast ball instead of carrying it; this is the
+    // centripetal part of the same interaction, applied where the curve is.
+    if (mode.current === "play") {
+      const here = ball.translation();
+      if (here.x < -0.2 && here.z < -0.12) {
+        const dx = -0.22 - here.x;
+        const dz = -0.04 - here.z;
+        const len = Math.hypot(dx, dz) || 1;
+        const v = ball.linvel();
+        const pull = 11 * delta;
+        ball.setLinvel(
+          { x: v.x + (dx / len) * pull, y: v.y, z: v.z + (dz / len) * pull },
+          true,
+        );
+      }
+    }
+
+    // The ball has rolled back down the lane onto the plunger: re-arm it so the
+    // spring can be pulled again.
+    if (
+      mode.current === "play" &&
+      t.z < DIVIDER_Z &&
+      t.x > PLUNGER_X - 0.03 &&
+      Math.hypot(ball.linvel().x, ball.linvel().z) < 0.35
+    ) {
+      mode.current = "idle";
+      shared.charge = 0;
+      onCharge(0);
+      resetBall();
     }
 
     // Drained: past the flippers into the field, or under the playfield.
@@ -813,10 +843,10 @@ function Pinball({
         <meshStandardMaterial color="#d8dde4" roughness={0.12} metalness={0.95} />
       </mesh>
 
-      <group ref={leftFlip} position={[0.34, PLAY.y + 0.02, M(0.062)]}>
+      <group ref={leftFlip} position={[0.34, PLAY.y + 0.02, M(0.112)]}>
         <FlipperMesh side={1} />
       </group>
-      <group ref={rightFlip} position={[0.34, PLAY.y + 0.02, M(-0.062)]}>
+      <group ref={rightFlip} position={[0.34, PLAY.y + 0.02, M(-0.112)]}>
         <FlipperMesh side={-1} />
       </group>
     </>
