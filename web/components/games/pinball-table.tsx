@@ -378,9 +378,9 @@ function TopBumper() {
       Casing: PART_CREAM,
       Frame: PART_DARK,
       Face: new THREE.MeshStandardMaterial({
-        color: "#d62324",
-        roughness: 0.28,
-        metalness: 0.15,
+        color: "#7d0b10",
+        roughness: 0.1,
+        metalness: 0.35,
       }),
       Screw: PART_STEEL,
     }),
@@ -391,7 +391,7 @@ function TopBumper() {
     <GltfPart
       url="/models/pinball/curved_bumper.glb"
       mapping={map}
-      position={[x, PLAY.y + 0.004, z]}
+      position={[x, PLAY.y + 0.006, z]}
       rotation={[0, Math.PI / 2, 0]}
     />
   );

@@ -24,6 +24,8 @@ import sys
 _args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 STEM = _args[0] if len(_args) > 0 else "plate_contours"
 NAME = _args[1] if len(_args) > 1 else "slingshot"
+# A third argument scales the layer thickness, for chunkier objects.
+THICKNESS = float(_args[2]) if len(_args) > 2 else 1.0
 DATA = HERE / "out" / f"{STEM}.json"
 
 LAYERS = {
@@ -102,7 +104,7 @@ def main() -> None:
         points = data.get(key) or []
         if len(points) < 3:
             continue
-        parts.append(build(name, points, thickness, z))
+        parts.append(build(name, points, thickness * THICKNESS, z * THICKNESS))
         print(f"  {name}: {len(points)} points")
 
     colour = data.get("faceColor")
