@@ -1322,24 +1322,12 @@ function Cabinet() {
   return (
     <group>
       <Slate />
-      {[
-        { pos: [0, PLAY.y - 0.02, outerW / 2 + 0.005], size: [outerL, RAIL_H, RAIL] },
-        { pos: [0, PLAY.y - 0.02, -(outerW / 2 + 0.005)], size: [outerL, RAIL_H, RAIL] },
-        { pos: [outerL / 2 + 0.005, PLAY.y - 0.02, 0], size: [RAIL, RAIL_H, outerW] },
-        { pos: [-(outerL / 2 + 0.005), PLAY.y - 0.02, 0], size: [RAIL, RAIL_H, outerW] },
-      ].map((r, i) => (
-        <RoundedBox
-          key={i}
-          args={r.size as [number, number, number]}
-          radius={0.008}
-          smoothness={2}
-          position={r.pos as [number, number, number]}
-          castShadow
-          receiveShadow
-        >
-          <primitive object={wood} attach="material" />
-        </RoundedBox>
-      ))}
+      {/* Frame: one mitered ring from Blender, so the corners join. */}
+      <GltfPart
+        url="/models/pinball/cabinet_frame.glb"
+        mapping={{ CabinetFrame: wood }}
+        position={[0, PLAY.y - 0.0475, 0]}
+      />
 
       {BUMPERS.map((b, i) => (
         <Bumper key={i} id={i} x={b.x} z={M(b.dz)} color={b.color} />
