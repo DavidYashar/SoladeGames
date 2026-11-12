@@ -1,12 +1,12 @@
-"""Slingshot plate, matched to the reference image.
+"""Slingshot plate: a smooth teardrop wedge, matched to the reference.
 
     blender -b --python art/build_slingshot.py
 
-A rounded triangle: a near-vertical long edge on the right, a flat bottom, and a
-hypotenuse from the bottom-left up to the apex. Cream rim outside, dark pinstripe,
-glossy amber face, two cross-head screws near the apex and the bottom-left corner.
+The silhouette is one closed smooth curve, not a filleted triangle: a fat rounded
+lobe at the bottom, a tapered rounded point at the top, convex on both sides. Cream
+casing outside, black frame, amber face, two cross-head screws.
 
-Centred on its centroid, apex toward +Y, wide edge toward -Y.
+Apex toward +Y, lobe toward -Y, centred on the centroid.
 """
 
 from __future__ import annotations
@@ -26,17 +26,17 @@ def clear() -> None:
     bpy.ops.object.delete(use_global=False)
 
 
-def bevel(obj, width: float, segments: int = 5) -> None:
+def bevel(obj, width: float, segments: int = 4) -> None:
     bpy.context.view_layer.objects.active = obj
     mod = obj.modifiers.new("Bevel", "BEVEL")
     mod.width = width
     mod.segments = segments
     mod.limit_method = "ANGLE"
-    mod.angle_limit = math.radians(35)
+    mod.angle_limit = math.radians(30)
     bpy.ops.object.modifier_apply(modifier=mod.name)
 
 
-def smooth(obj, angle: float = math.radians(50)) -> None:
+def smooth(obj, angle: float = math.radians(60)) -> None:
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     try:
@@ -46,35 +46,32 @@ def smooth(obj, angle: float = math.radians(50)) -> None:
     obj.select_set(False)
 
 
-def rounded_triangle(points, radius: float, steps: int = 14):
-    """Round each corner with an arc and return the closed outline."""
+def catmull_rom(points, samples: int = 14):
+    """Closed Catmull-Rom spline through the control points."""
     out: list[tuple[float, float]] = []
-    for i in range(3):
-        px, py = points[i]
-        ax, ay = points[(i - 1) % 3]
-        bx, by = points[(i + 1) % 3]
-
-        v1 = (ax - px, ay - py)
-        v2 = (bx - px, by - py)
-        l1 = math.hypot(*v1) or 1.0
-        l2 = math.hypot(*v2) or 1.0
-        v1 = (v1[0] / l1, v1[1] / l1)
-        v2 = (v2[0] / l2, v2[1] / l2)
-
-        r = min(radius, l1 * 0.42, l2 * 0.42)
-        start = (px + v1[0] * r, py + v1[1] * r)
-        end = (px + v2[0] * r, py + v2[1] * r)
-
-        a1 = math.atan2(start[1] - py, start[0] - px)
-        a2 = math.atan2(end[1] - py, end[0] - px)
-        while a2 - a1 > math.pi:
-            a2 -= math.pi * 2
-        while a1 - a2 > math.pi:
-            a2 += math.pi * 2
-
-        for s in range(steps + 1):
-            a = a1 + (a2 - a1) * (s / steps)
-            out.append((px + math.cos(a) * r, py + math.sin(a) * r))
+    n = len(points)
+    for i in range(n):
+        p0 = points[(i - 1) % n]
+        p1 = points[i]
+        p2 = points[(i + 1) % n]
+        p3 = points[(i + 2) % n]
+        for s in range(samples):
+            t = s / samples
+            t2 = t * t
+            t3 = t2 * t
+            x = 0.5 * (
+                2 * p1[0]
+                + (-p0[0] + p2[0]) * t
+                + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+                + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+            )
+            y = 0.5 * (
+                2 * p1[1]
+                + (-p0[1] + p2[1]) * t
+                + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+                + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+            )
+            out.append((x, y))
     return out
 
 
@@ -102,16 +99,16 @@ def scaled(outline, factor):
 
 
 def screw(name: str, x: float, y: float, z: float):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.004, depth=0.005, location=(x, y, z))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.0036, depth=0.005, location=(x, y, z))
     head = bpy.context.active_object
     head.name = name
-    bevel(head, 0.0009, 3)
+    bevel(head, 0.0008, 3)
     parts = [head]
     for i, rot in enumerate((0.0, math.pi / 2)):
         bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y, z + 0.0026))
         slot = bpy.context.active_object
         slot.name = f"{name}Slot{i}"
-        slot.scale = (0.0056, 0.0008, 0.0012)
+        slot.scale = (0.005, 0.0007, 0.0012)
         slot.rotation_euler = (0, 0, rot)
         bpy.context.view_layer.objects.active = slot
         bpy.ops.object.transform_apply(scale=True, rotation=True)
@@ -122,18 +119,25 @@ def screw(name: str, x: float, y: float, z: float):
 def main() -> None:
     clear()
 
-    # Long edge on the right, flat bottom, hypotenuse to the apex: the reference form.
-    tri = [(-0.03, -0.055), (0.032, -0.055), (0.004, 0.082)]
-    face_outline = rounded_triangle(tri, 0.006, 8)
+    # Silhouette control points: tapered point at the top, fat lobe at the bottom,
+    # slightly asymmetric so it leans like the reference.
+    control = [
+        (0.000, 0.085),    # apex
+        (0.040, 0.020),    # right shoulder
+        (0.048, -0.035),   # right side of the lobe
+        (0.010, -0.072),   # bottom of the lobe
+        (-0.040, -0.048),  # left side of the lobe
+        (-0.030, 0.015),   # left shoulder
+    ]
+    outline = catmull_rom(control, 16)
 
-    # Thickness grows inward to outward, so every layer shows beyond the one above it.
-    rim = extruded("Rim", scaled(face_outline, 1.18), 0.013, 0.0)
-    stripe = extruded("Stripe", scaled(face_outline, 1.07), 0.016, 0.0)
-    face = extruded("Face", face_outline, 0.019, 0.001)
+    rim = extruded("Rim", scaled(outline, 1.18), 0.012, 0.0)
+    stripe = extruded("Stripe", scaled(outline, 1.06), 0.015, 0.0)
+    face = extruded("Face", outline, 0.018, 0.001)
 
     parts = [rim, stripe, face]
-    parts += screw("ScrewTop", 0.012, 0.045, 0.011)
-    parts += screw("ScrewLow", -0.012, -0.032, 0.011)
+    parts += screw("ScrewTop", 0.0, 0.052, 0.011)
+    parts += screw("ScrewLow", 0.008, -0.040, 0.011)
 
     bpy.ops.object.select_all(action="DESELECT")
     for obj in parts:
