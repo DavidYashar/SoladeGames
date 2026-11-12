@@ -721,13 +721,6 @@ function Pinball({
         return collider;
       };
 
-      // Outer walls.
-      box(HALF_L, 0.012, 0, HALF_W, 0.5); // left wall
-      box(0.012, HALF_W, HALF_L, 0, 0.5); // near wall, behind the plunger
-
-      // The lane's outer wall stops where the exit curve begins.
-      box((HALF_L + 0.3) / 2, 0.012, (HALF_L - 0.3) / 2, -HALF_W, 0.5);
-
       // Head curve, corridor divider and lane exit: colliders built from the same
       // segment list Blender used to model them, so mesh and physics cannot drift.
       for (const seg of WALLS.segments) {
@@ -1375,19 +1368,6 @@ function Cabinet() {
         >
           <primitive object={wood} attach="material" />
         </RoundedBox>
-      ))}
-
-      {/* Inner walls, drawn to match the colliders. */}
-      {[
-        { pos: [0, PLAY.y + 0.02, HALF_W + 0.006], size: [PLAY.l, 0.04, 0.012] },
-        { pos: [0, PLAY.y + 0.02, -(HALF_W + 0.006)], size: [PLAY.l, 0.04, 0.012] },
-        { pos: [HALF_L + 0.006, PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
-        { pos: [-(HALF_L + 0.006), PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
-      ].map((r, i) => (
-        <mesh key={`w${i}`} position={r.pos as [number, number, number]} castShadow receiveShadow>
-          <boxGeometry args={r.size as [number, number, number]} />
-          <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-        </mesh>
       ))}
 
       {BUMPERS.map((b, i) => (

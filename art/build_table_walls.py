@@ -143,6 +143,11 @@ def main() -> None:
     clear()
 
     walls = {
+        # Perimeter: the same profile as the internal walls.
+        "outerLeft": [(-HALF_L, HALF_W), (HALF_L, HALF_W)],
+        "outerLane": [(HALF_L, -HALF_W), (0.3, -HALF_W)],
+        "outerNear": [(HALF_L, HALF_W), (HALF_L, -HALF_W)],
+        # Internal.
         "divider": [(DIVIDER_FROM, DIVIDER_Z), (DIVIDER_TO, DIVIDER_Z)],
         "head": head_arc(),
         "laneEnd": [(-0.3, -HALF_W + 0.012), TOP_RAMP],
