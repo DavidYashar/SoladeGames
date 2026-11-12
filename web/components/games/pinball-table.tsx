@@ -97,10 +97,10 @@ const PLUNGER_X = HALF_L - 0.115;
 const FLIP_REST = 0.785;
 const FLIP_SWING = 0.524;
 const DOWNHILL = 1.5;
-const MAX_SPEED = 6.6;
+const MAX_SPEED = 5.2;
 
 const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
-const FLIP_SPEED = 34;
+const FLIP_SPEED = 26;
 
 const PART_METAL = new THREE.MeshStandardMaterial({
   color: "#252a31",
@@ -386,6 +386,26 @@ const LANE_MAP = {
 };
 
 const ARM_ROTATION = Math.PI;
+
+const WALL_MAP = {
+  DividerBody: PART_METAL,
+  DividerCap: PART_CREAM,
+  HeadBody: PART_METAL,
+  HeadCap: PART_CREAM,
+  LaneEndBody: PART_METAL,
+  LaneEndCap: PART_CREAM,
+};
+
+/** Divider, head curve and lane exit, modelled in Blender in world coordinates. */
+function TableWalls() {
+  return (
+    <GltfPart
+      url="/models/pinball/table_walls.glb"
+      mapping={WALL_MAP}
+      position={[0, PLAY.y, 0]}
+    />
+  );
+}
 
 
 /** The black curved guide that carries the ball down to a flipper. */
@@ -839,7 +859,7 @@ function Pinball({
           RAPIER.ColliderDesc.cuboid(FLIPPER.len / 2, 0.012, FLIPPER.width / 2)
             .setTranslation(FLIPPER.len / 2, 0, 0)
             .setFriction(0.06)
-            .setRestitution(0.78),
+            .setRestitution(0.66),
           body,
         );
         body.setRotation(quatFromY(side * FLIP_REST), true);
@@ -982,7 +1002,7 @@ function Pinball({
           (window as unknown as { __fires?: number }).__fires =
             ((window as unknown as { __fires?: number }).__fires ?? 0) + 1;
           // Charge 0..1 maps onto 1.6..5.4 m/s.
-          const speed = 1.6 + shared.charge * 3.8;
+          const speed = 1.4 + shared.charge * 2.9;
           ball.setLinvel({ x: -speed, y: 0, z: 0 }, true);
           (window as unknown as { __fireVel?: unknown }).__fireVel = ball.linvel();
           shared.charge = 0;
@@ -1218,7 +1238,7 @@ function Pinball({
 
         const boost = Math.min(
           MAX_SPEED,
-          Math.max(4.6, incoming * 1.45 + 1.6),
+          Math.max(3.9, incoming * 1.3 + 1.3),
         );
         const vx = Math.cos(angle) * boost;
         const vz = Math.sin(angle) * boost;
@@ -1371,10 +1391,6 @@ function Cabinet() {
         { pos: [0, PLAY.y + 0.02, -(HALF_W + 0.006)], size: [PLAY.l, 0.04, 0.012] },
         { pos: [HALF_L + 0.006, PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
         { pos: [-(HALF_L + 0.006), PLAY.y + 0.02, 0], size: [0.012, 0.04, PLAY.w] },
-        {
-          pos: [(DIVIDER_FROM + DIVIDER_TO) / 2, PLAY.y + 0.02, DIVIDER_Z],
-          size: [DIVIDER_FROM - DIVIDER_TO, 0.04, 0.012],
-        },
       ].map((r, i) => (
         <mesh key={`w${i}`} position={r.pos as [number, number, number]} castShadow receiveShadow>
           <boxGeometry args={r.size as [number, number, number]} />
@@ -1400,24 +1416,7 @@ function Cabinet() {
       <LaneWall side={1} />
       <LaneWall side={-1} />
 
-      {/* Curved head, matching its colliders. */}
-      {TOP_ARC.slice(0, -1).map(([x0, z0], i) => {
-        const [x1, z1] = TOP_ARC[i + 1];
-        const dx = x1 - x0;
-        const dz = z1 - z0;
-        const len = Math.hypot(dx, dz);
-        return (
-          <mesh
-            key={`head${i}`}
-            position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
-            rotation={[0, Math.atan2(-dz, dx), 0]}
-            castShadow
-          >
-            <boxGeometry args={[len, 0.04, 0.012]} />
-            <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-          </mesh>
-        );
-      })}
+      <TableWalls />
 
       {/* Top arch with a saucer behind it. */}
       <mesh position={[-0.33, PLAY.y + 0.02, M(0)]} rotation={[Math.PI / 2, 0, 0]}>
@@ -1432,24 +1431,6 @@ function Cabinet() {
         <ringGeometry args={[0.026, 0.032, 24]} />
         <meshBasicMaterial color={AMBER} toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
-
-      {CIRCUIT.slice(0, -1).map(([x0, z0], i) => {
-        const [x1, z1] = CIRCUIT[i + 1];
-        const dx = x1 - x0;
-        const dz = z1 - z0;
-        const len = Math.hypot(dx, dz);
-        return (
-          <mesh
-            key={`circ${i}`}
-            position={[(x0 + x1) / 2, PLAY.y + 0.02, (z0 + z1) / 2]}
-            rotation={[0, Math.atan2(-dz, dx), 0]}
-            castShadow
-          >
-            <boxGeometry args={[len, 0.04, 0.012]} />
-            <meshStandardMaterial color="#33383f" roughness={0.3} metalness={0.75} />
-          </mesh>
-        );
-      })}
 
       {/* Apron and legs */}
       <mesh position={[0.62, PLAY.y - 0.07, 0]} castShadow receiveShadow>
