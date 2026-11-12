@@ -1,18 +1,22 @@
-"""Table walls that were being drawn in code: divider, head curve, lane exit.
+"""Table walls, modelled properly, with the collider data exported alongside.
 
     blender -b --python art/build_table_walls.py
 
-Built in world coordinates, so the asset is placed at the playfield origin with no
-offset and cannot drift from the numbers in the game.
+Writes two files from ONE set of numbers:
 
-Style matches the flipper arms: a black body with a cream cap along the top.
+    web/public/models/pinball/table_walls.glb   the mesh
+    web/lib/pinball/table-walls.json            the segments the colliders are built from
 
-Blender (x, y) = world (x, -z); height runs up Blender z. The glTF exporter's Y-up
-conversion then gives three.js (x, height, z) as expected.
+So the wall the ball hits and the wall you see cannot disagree: re-shape the paths
+below, rebuild, and both change together.
+
+Profile, matching the flipper arms: a cream plinth, a dark body on top of it, and a
+bevelled cap. Blender (x, y) = world (x, -z); height runs up Blender z.
 """
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
@@ -20,7 +24,9 @@ import bpy
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent / "web" / "public" / "models" / "pinball"
+DATA = HERE.parent / "web" / "lib" / "pinball" / "table-walls.json"
 OUT.mkdir(parents=True, exist_ok=True)
+DATA.parent.mkdir(parents=True, exist_ok=True)
 
 HALF_W = 0.27
 HALF_L = 0.54
@@ -33,10 +39,12 @@ DIVIDER_FROM = HALF_L - 0.1
 DIVIDER_TO = -0.22
 TOP_RAMP = (-0.368, -0.2)
 
-WALL_H = 0.04
+WALL_H = 0.042
 WALL_W = 0.012
-CAP_H = 0.004
-CAP_W = 0.0115
+PLINTH_H = 0.018
+PLINTH_W = WALL_W + 0.008
+CAP_H = 0.006
+CAP_W = WALL_W + 0.003
 
 
 def clear() -> None:
@@ -44,7 +52,7 @@ def clear() -> None:
     bpy.ops.object.delete(use_global=False)
 
 
-def bevel(obj, width: float, segments: int = 3) -> None:
+def bevel(obj, width: float, segments: int = 4) -> None:
     bpy.context.view_layer.objects.active = obj
     mod = obj.modifiers.new("Bevel", "BEVEL")
     mod.width = width
@@ -54,7 +62,7 @@ def bevel(obj, width: float, segments: int = 3) -> None:
     bpy.ops.object.modifier_apply(modifier=mod.name)
 
 
-def smooth(obj, angle: float = math.radians(45)) -> None:
+def smooth(obj, angle: float = math.radians(40)) -> None:
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     try:
@@ -65,7 +73,6 @@ def smooth(obj, angle: float = math.radians(45)) -> None:
 
 
 def segment(name: str, p0, p1, width: float, height: float, z0: float):
-    """A box from world point p0 to p1, centred on the segment."""
     x0, y0 = p0
     x1, y1 = p1
     dx, dy = x1 - x0, y1 - y0
@@ -83,35 +90,42 @@ def segment(name: str, p0, p1, width: float, height: float, z0: float):
     return obj
 
 
-def wall(prefix: str, world_points, height=WALL_H, width=WALL_W):
-    """Body plus a cream cap, along a world-space polyline."""
-    body_parts = []
-    cap_parts = []
+def join(parts, name):
+    bpy.ops.object.select_all(action="DESELECT")
+    for p in parts:
+        p.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    obj = bpy.context.active_object
+    obj.name = name
+    return obj
+
+
+def build_wall(prefix: str, world_points):
+    """Dark body, cream plinth under it, and a bevelled cap."""
+    bodies, plinths, caps = [], [], []
     for i in range(len(world_points) - 1):
         (x0, z0), (x1, z1) = world_points[i], world_points[i + 1]
-        p0 = (x0, -z0)
-        p1 = (x1, -z1)
-        body_parts.append(segment(f"{prefix}Body{i}", p0, p1, width, height, 0.0))
-        cap_parts.append(
-            segment(f"{prefix}Cap{i}", p0, p1, CAP_W, CAP_H, height - CAP_H * 0.5)
+        p0, p1 = (x0, -z0), (x1, -z1)
+        plinths.append(segment(f"{prefix}P{i}", p0, p1, PLINTH_W, PLINTH_H, 0.0))
+        bodies.append(segment(f"{prefix}B{i}", p0, p1, WALL_W, WALL_H, 0.0))
+        caps.append(
+            segment(f"{prefix}C{i}", p0, p1, CAP_W, CAP_H, WALL_H - CAP_H * 0.6)
         )
 
-    def join(parts, name):
-        bpy.ops.object.select_all(action="DESELECT")
-        for p in parts:
-            p.select_set(True)
-        bpy.context.view_layer.objects.active = parts[0]
-        bpy.ops.object.join()
-        obj = bpy.context.active_object
-        obj.name = name
-        return obj
+    body = join(bodies, f"{prefix}Body")
+    plinth = join(plinths, f"{prefix}Plinth")
+    cap = join(caps, f"{prefix}Cap")
 
-    body = join(body_parts, f"{prefix}Body")
-    cap = join(cap_parts, f"{prefix}Cap")
-    return [body, cap]
+    bevel(body, 0.0022, 4)
+    bevel(plinth, 0.0018, 4)
+    bevel(cap, 0.0015, 4)
+    for obj in (body, plinth, cap):
+        smooth(obj)
+    return [plinth, body, cap]
 
 
-def head_arc(steps: int = 22):
+def head_arc(steps: int = 48):
     cx, cz = -0.31, M(0)
     r = math.hypot(TOP_RAMP[0] - cx, TOP_RAMP[1] - cz)
     a0 = math.pi / 2
@@ -128,14 +142,16 @@ def head_arc(steps: int = 22):
 def main() -> None:
     clear()
 
-    parts = []
-    parts += wall("Divider", [(DIVIDER_FROM, DIVIDER_Z), (DIVIDER_TO, DIVIDER_Z)])
-    parts += wall("Head", head_arc())
-    parts += wall("LaneEnd", [(-0.3, -HALF_W + 0.012), TOP_RAMP])
+    walls = {
+        "divider": [(DIVIDER_FROM, DIVIDER_Z), (DIVIDER_TO, DIVIDER_Z)],
+        "head": head_arc(),
+        "laneEnd": [(-0.3, -HALF_W + 0.012), TOP_RAMP],
+    }
 
-    for obj in parts:
-        bevel(obj, 0.002, 3)
-        smooth(obj)
+    parts = []
+    for name, points in walls.items():
+        prefix = name[0].upper() + name[1:]
+        parts += build_wall(prefix, points)
 
     bpy.ops.object.select_all(action="DESELECT")
     for obj in parts:
@@ -153,6 +169,27 @@ def main() -> None:
         export_materials="EXPORT",
     )
     print(f"  wrote {path.name}  {path.stat().st_size / 1024:.1f} KB")
+
+    # The collider source: the same paths, at the body's footprint.
+    segments = []
+    for name, points in walls.items():
+        for i in range(len(points) - 1):
+            (x0, z0), (x1, z1) = points[i], points[i + 1]
+            segments.append(
+                {
+                    "x0": round(x0, 5),
+                    "z0": round(z0, 5),
+                    "x1": round(x1, 5),
+                    "z1": round(z1, 5),
+                    "halfWidth": round(WALL_W / 2, 5),
+                    "halfHeight": round(WALL_H / 2, 5),
+                }
+            )
+    DATA.write_text(
+        json.dumps({"height": WALL_H, "segments": segments}, indent=2),
+        encoding="utf-8",
+    )
+    print(f"  wrote {DATA.name}  {len(segments)} segments")
 
 
 main()

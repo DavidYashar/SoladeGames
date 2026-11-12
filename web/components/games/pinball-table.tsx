@@ -8,6 +8,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 import { makeWoodTextures } from "@/lib/jenga/wood";
+import WALLS from "@/lib/pinball/table-walls.json";
 
 /**
  * Neon Pinball.
@@ -102,6 +103,16 @@ const MAX_SPEED = 5.2;
 const FLIPPER = { len: 0.1, thick: 0.014, width: 0.028 };
 const FLIP_SPEED = 26;
 
+const PART_WALL = new THREE.MeshStandardMaterial({
+  color: "#0a0c10",
+  roughness: 0.1,
+  metalness: 0.92,
+});
+const PART_WALL_EDGE = new THREE.MeshStandardMaterial({
+  color: "#191d24",
+  roughness: 0.18,
+  metalness: 0.88,
+});
 const PART_METAL = new THREE.MeshStandardMaterial({
   color: "#252a31",
   roughness: 0.32,
@@ -388,12 +399,9 @@ const LANE_MAP = {
 const ARM_ROTATION = Math.PI;
 
 const WALL_MAP = {
-  DividerBody: PART_METAL,
-  DividerCap: PART_CREAM,
-  HeadBody: PART_METAL,
-  HeadCap: PART_CREAM,
-  LaneEndBody: PART_METAL,
-  LaneEndCap: PART_CREAM,
+  Body: PART_WALL,
+  Plinth: PART_WALL_EDGE,
+  Cap: PART_WALL_EDGE,
 };
 
 /** Divider, head curve and lane exit, modelled in Blender in world coordinates. */
@@ -720,39 +728,23 @@ function Pinball({
       // The lane's outer wall stops where the exit curve begins.
       box((HALF_L + 0.3) / 2, 0.012, (HALF_L - 0.3) / 2, -HALF_W, 0.5);
 
-      // Curved head, instead of a flat far wall.
-      for (let i = 0; i < TOP_ARC.length - 1; i += 1) {
-        const [x0, z0] = TOP_ARC[i];
-        const [x1, z1] = TOP_ARC[i + 1];
-        const dx = x1 - x0;
-        const dz = z1 - z0;
+      // Head curve, corridor divider and lane exit: colliders built from the same
+      // segment list Blender used to model them, so mesh and physics cannot drift.
+      for (const seg of WALLS.segments) {
+        const dx = seg.x1 - seg.x0;
+        const dz = seg.z1 - seg.z0;
         const len = Math.hypot(dx, dz);
+        if (len < 1e-5) continue;
         w.createCollider(
-          RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.008)
-            .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
+          RAPIER.ColliderDesc.cuboid(len / 2, seg.halfHeight, seg.halfWidth)
+            .setTranslation(
+              (seg.x0 + seg.x1) / 2,
+              PLAY.y + seg.halfHeight,
+              (seg.z0 + seg.z1) / 2,
+            )
             .setRotation(quatFromY(Math.atan2(-dz, dx)))
             .setFriction(0.04)
-            .setRestitution(0.55),
-        );
-      }
-
-      // Corridor divider: the ball shoots up the right lane and leaves at the top.
-      box((DIVIDER_FROM - DIVIDER_TO) / 2, 0.008, (DIVIDER_FROM + DIVIDER_TO) / 2, DIVIDER_Z, 0.3);
-
-      // The corridor exit: a short arc that carries the ball out of the lane and into
-      // the playfield, instead of letting it fall straight back down.
-      for (let i = 0; i < CIRCUIT.length - 1; i += 1) {
-        const [x0, z0] = CIRCUIT[i];
-        const [x1, z1] = CIRCUIT[i + 1];
-        const dx = x1 - x0;
-        const dz = z1 - z0;
-        const len = Math.hypot(dx, dz);
-        w.createCollider(
-          RAPIER.ColliderDesc.cuboid(len / 2, 0.03, 0.008)
-            .setTranslation((x0 + x1) / 2, PLAY.y + 0.03, (z0 + z1) / 2)
-            .setRotation(quatFromY(Math.atan2(-dz, dx)))
-            .setFriction(0.02)
-            .setRestitution(0.88),
+            .setRestitution(0.5),
         );
       }
 
