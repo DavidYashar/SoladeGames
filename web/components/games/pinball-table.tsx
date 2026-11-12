@@ -390,23 +390,20 @@ const SLING_MAP = {
   Screw: PART_STEEL,
 };
 
-/** Where each plate sits: the inside corner of the L formed by its arm. */
-// Midpoint of the arm's diagonal, which runs from the elbow (0.232, +/-0.2595) to
-// the flipper pivot (0.34, +/-0.1395). The plate nests there.
 // From the trace of the artwork:
-//   obtuse corner (94.7 deg) at (-0.040, -0.013), centroid at (-0.004, -0.003)
-//   longest side (118 mm) opposite it, midpoint at (0.012, 0.004)
-// The obtuse corner goes into the bend of the arm; the longest side faces the
-// middle of the field, slightly up-table.
-const SLING_CORNER = { x: -0.0367, z: 0.0099 }; // centroid -> obtuse corner
-const SLING_EDGE = { x: 0.0153, z: -0.0064 };   // centroid -> longest side midpoint
+//   obtuse corner (94.7 deg) at (-0.040, -0.013); centroid at (-0.004, -0.003)
+//   its two edges run toward (0.040, -0.048) and (-0.017, 0.055)
+// The obtuse corner sits on the arm's elbow, and its two edges straddle the arm's
+// upper run symmetrically, so the bisector is turned onto that run.
+const SLING_CORNER = { x: -0.0367, z: 0.0099 };   // centroid -> obtuse corner
+const SLING_BISECTOR = { x: 0.917, z: -0.399 };   // outward along the obtuse angle
 
-/** Elbow of each arm, where the two runs meet. */
+/** Elbow of each arm, where its two runs meet. */
 const ELBOW = { x: 0.232, z: 0.2595 };
 const ELBOW_RIGHT = { x: 0.232, z: -0.2045 };
 
-/** The point the longest side should face. */
-const SLING_AIM = { x: -0.05, z: M(0) };
+/** Each arm's upper run leaves the elbow straight up-table. */
+const ARM_RUN = { x: -1, z: 0 };
 
 function rotate2(v: { x: number; z: number }, theta: number) {
   const c = Math.cos(theta);
@@ -418,26 +415,12 @@ function angleTo(from: { x: number; z: number }, to: { x: number; z: number }) {
   return Math.atan2(from.z * to.x - from.x * to.z, from.x * to.x + from.z * to.z);
 }
 
-/**
- * Solve for the placement: rotate so the longest side faces the aim point, then shift
- * so the obtuse corner lands on the arm's elbow. Iterated because the aim direction
- * depends on where the plate ends up.
- */
+/** Turn the obtuse angle's bisector onto the arm's upper run, corner on the elbow. */
 function slingPlacement(side: 1 | -1) {
   const elbow = side > 0 ? ELBOW : ELBOW_RIGHT;
-  let pos = { x: elbow.x - 0.026, z: elbow.z - side * 0.026 };
-  let theta = 0;
-
-  for (let i = 0; i < 4; i += 1) {
-    const dx = SLING_AIM.x - pos.x;
-    const dz = SLING_AIM.z - pos.z;
-    const len = Math.hypot(dx, dz) || 1;
-    theta = angleTo(SLING_EDGE, { x: dx / len, z: dz / len });
-    const corner = rotate2(SLING_CORNER, theta);
-    pos = { x: elbow.x - corner.x, z: elbow.z - corner.z };
-  }
-
-  return { x: pos.x, z: pos.z, theta };
+  const theta = angleTo(SLING_BISECTOR, ARM_RUN);
+  const corner = rotate2(SLING_CORNER, theta);
+  return { x: elbow.x - corner.x, z: elbow.z - corner.z, theta };
 }
 
 
