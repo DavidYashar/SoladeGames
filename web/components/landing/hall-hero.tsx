@@ -31,6 +31,7 @@ const CABINETS: CabinetEntry[] = [
   },
   {
     name: "Neon Pinball",
+    route: "/games/pinball",
     control: "Flippers · plunger",
     accent: "indigo",
     kind: "pinball",
