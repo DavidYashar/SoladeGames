@@ -123,7 +123,7 @@ def main() -> None:
     clear()
 
     # Long edge on the right, flat bottom, hypotenuse to the apex: the reference form.
-    tri = [(-0.05, -0.052), (0.055, -0.052), (0.016, 0.088)]
+    tri = [(-0.03, -0.055), (0.032, -0.055), (0.004, 0.082)]
     face_outline = rounded_triangle(tri, 0.006, 8)
 
     # Thickness grows inward to outward, so every layer shows beyond the one above it.
@@ -132,8 +132,8 @@ def main() -> None:
     face = extruded("Face", face_outline, 0.019, 0.001)
 
     parts = [rim, stripe, face]
-    parts += screw("ScrewTop", 0.03, 0.05, 0.011)
-    parts += screw("ScrewLow", -0.026, -0.03, 0.011)
+    parts += screw("ScrewTop", 0.012, 0.045, 0.011)
+    parts += screw("ScrewLow", -0.012, -0.032, 0.011)
 
     bpy.ops.object.select_all(action="DESELECT")
     for obj in parts:

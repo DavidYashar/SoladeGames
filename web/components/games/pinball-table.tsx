@@ -380,8 +380,8 @@ const SLING_MAP = {
 // Midpoint of the arm's diagonal, which runs from the elbow (0.232, +/-0.2595) to
 // the flipper pivot (0.34, +/-0.1395). The plate nests there.
 const SLING_POS: Record<1 | -1, [number, number]> = {
-  1: [0.286, 0.1995],
-  [-1]: [0.286, -0.1445],
+  1: [0.264, 0.18],
+  [-1]: [0.264, -0.125],
 };
 
 /** The red triangle from the icon set: a kicker beside each flipper. */
