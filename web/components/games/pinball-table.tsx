@@ -171,6 +171,8 @@ const shared = {
   charge: 0,
   plungerHeld: false,
   score: 0,
+  slingKicks: 0,
+  bumperKicks: 0,
   combo: 0,
   comboAt: 0,
   onScore: null as ((v: number) => void) | null,
@@ -542,6 +544,7 @@ function Pinball({
   const { camera, gl } = useThree();
   const ballMesh = useRef<THREE.Mesh>(null);
   const ballRoot = useRef<THREE.Group>(null);
+  const liveBall = useRef<RAPIER.RigidBody | null>(null);
   const { scene: ballScene } = useGLTF("/models/pinball/ball.glb");
   const ballModel = useMemo(() => {
     const material = new THREE.MeshPhysicalMaterial({
@@ -572,6 +575,9 @@ function Pinball({
   const scoring = useRef<Record<number, number>>({});
   const bumperAt = useRef(new Map<number, { x: number; z: number }>()).current;
   const bumperHandles = useRef(new Map<number, number>());
+  const slingSides = useRef(new Map<number, number>());
+  const bumperCooldown = useRef<Record<number, number>>({});
+  const slingCooldown = useRef<Record<number, number>>({});
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
   const mode = useRef<"idle" | "play">("idle");
@@ -664,15 +670,19 @@ function Pinball({
         );
       }
 
-      // Slingshot faces: a kicker just inside each funnel.
+      // Slingshot plates: one collider per triangle, centred on the plate itself.
+      // The triangle spans x -0.075..0.04 with its base on the rail, so its centroid
+      // sits at x = -0.017 and 25 mm in from the rail.
       for (const side of [1, -1] as const) {
+        const railZ = side > 0 ? 0.27 : -0.203;
         const c = w.createCollider(
-          RAPIER.ColliderDesc.cuboid(0.058, 0.03, 0.03)
-            .setTranslation(-0.017, PLAY.y + 0.03, side > 0 ? 0.225 : -0.158)
-            .setFriction(0.04)
-            .setRestitution(1.15),
+          RAPIER.ColliderDesc.cuboid(0.052, 0.028, 0.028)
+            .setTranslation(-0.017, PLAY.y + 0.028, railZ - side * 0.025)
+            .setFriction(0.03)
+            .setRestitution(0.9),
         );
         scoring.current[c.handle] = 25;
+        slingSides.current.set(c.handle, side);
       }
 
       // Funnels: two walls per side running from the side rail down to the flipper
@@ -809,6 +819,7 @@ function Pinball({
       world.current = w;
       events.current = new RAPIER.EventQueue(true);
       shared.ball = ball;
+      liveBall.current = ball;
       const ballColliderRef = ballCollider;
       (window as unknown as { __flip?: () => unknown }).__flip = () => ({
         left: Number(flip.current.left.toFixed(3)),
@@ -855,6 +866,8 @@ function Pinball({
         x: number,
         z: number,
       ) => {
+        const ball = liveBall.current;
+        if (!ball) return;
         mode.current = "play";
         ball.setTranslation({ x, y: PLAY.y + 0.03, z }, true);
         ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -863,10 +876,14 @@ function Pinball({
         vx: number,
         vz: number,
       ) => {
+        const ball = liveBall.current;
+        if (!ball) return;
         mode.current = "play";
         ball.setLinvel({ x: vx, y: 0, z: vz }, true);
       };
       (window as unknown as { __pin?: () => unknown }).__pin = () => {
+        if (!liveBall.current || !world.current) return { x: 0, y: 0, z: 0, vx: 0, vz: 0, charge: 0, mode: "idle", held: false, slingKicks: 0, bumperKicks: 0 };
+        const ball = liveBall.current;
         const tr = ball.translation();
         const v = ball.linvel();
         return {
@@ -878,6 +895,10 @@ function Pinball({
           charge: shared.charge,
           mode: mode.current,
           held: shared.plungerHeld,
+          slingKicks: shared.slingKicks,
+          bumperMap: bumperAt.size,
+          slingMap: slingSides.current.size,
+          bumperKicks: shared.bumperKicks,
         };
       };
       shared.onScore = onScore;
@@ -1016,9 +1037,33 @@ function Pinball({
           shared.onScore?.(shared.score);
         }
 
+        // A slingshot throws the ball back out in a random direction, biased away
+        // from its rail and up the table.
+        const slingSide = slingSides.current.get(h1) ?? slingSides.current.get(h2);
+        if (slingSide !== undefined) {
+          shared.slingKicks += 1;
+          const inward = slingSide > 0 ? -1 : 1;
+          const railZ = slingSide > 0 ? 0.27 : -0.203;
+          const plateZ = railZ - slingSide * 0.025;
+          const speed = 3.4 + Math.random() * 1.4;
+          const spread = (Math.random() - 0.5) * (Math.PI * 0.72);
+          const vz = Math.cos(spread) * inward * speed;
+          const vx = Math.sin(spread) * speed - 1.1;
+
+          // The ball is usually inside the plate when the contact fires; move it clear
+          // first, or the solver spends the kick pushing it out of the geometry.
+          const t = ball.translation();
+          ball.setTranslation(
+            { x: t.x, y: PLAY.y + 0.025, z: plateZ + inward * 0.05 },
+            true,
+          );
+          ball.setLinvel({ x: vx, y: 0.15, z: vz }, true);
+        }
+
         // A bumper does not just bounce the ball, it fires it away.
         const bumper = bumperAt.get(h1) ?? bumperAt.get(h2);
         if (bumper) {
+          shared.bumperKicks += 1;
           const id = bumperHandles.current.get(h1) ?? bumperHandles.current.get(h2);
           if (id !== undefined) shared.flash[id] = performance.now();
 
@@ -1052,6 +1097,62 @@ function Pinball({
     if (ballRoot.current) {
       ballRoot.current.position.set(t.x, t.y, t.z);
       ballRoot.current.quaternion.set(r.x, r.y, r.z, r.w);
+    }
+
+    // Bells and slingshots are triggered by proximity rather than by collision
+    // handle: it is deterministic, and it cannot be broken by a collider handle
+    // changing when the world is rebuilt.
+    if (mode.current === "play") {
+      const t = ball.translation();
+      const now = performance.now();
+
+      BUMPERS.forEach((b, index) => {
+        const bz = M(b.dz);
+        const dx = t.x - b.x;
+        const dz = t.z - bz;
+        const distance = Math.hypot(dx, dz);
+        if (distance > 0.05) return;
+        if (now < (bumperCooldown.current[index] ?? 0)) return;
+        bumperCooldown.current[index] = now + 220;
+
+        shared.flash[index] = now;
+        shared.combo = Math.min(6, shared.combo + 1);
+        shared.comboAt = now;
+        shared.onCombo?.(shared.combo);
+
+        const value = b.value * (1 + shared.combo);
+        shared.score += value;
+        shared.onScore?.(shared.score);
+
+        const len = distance || 1;
+        const dir = distance > 0.004 ? { x: dx / len, z: dz / len } : { x: 0.6, z: 0.8 };
+        const v = ball.linvel();
+        const incoming = Math.hypot(v.x, v.z);
+        const outSpeed = Math.min(6.5, Math.max(2.8, incoming * 0.85 + 2.2));
+        ball.setLinvel({ x: dir.x * outSpeed, y: 0.35, z: dir.z * outSpeed }, true);
+      });
+
+      for (const side of [1, -1] as const) {
+        const railZ = side > 0 ? 0.27 : -0.203;
+        const plateZ = railZ - side * 0.025;
+        const dx = t.x + 0.017;
+        const dz = t.z - plateZ;
+        if (Math.hypot(dx, dz) > 0.06) continue;
+        if (now < (slingCooldown.current[side] ?? 0)) continue;
+        slingCooldown.current[side] = now + 260;
+
+        const inward = side > 0 ? -1 : 1;
+        const speed = 3.4 + Math.random() * 1.4;
+        const spread = (Math.random() - 0.5) * (Math.PI * 0.72);
+        const vz = Math.cos(spread) * inward * speed;
+        const vx = Math.sin(spread) * speed - 1.1;
+
+        shared.score += 25;
+        shared.onScore?.(shared.score);
+
+        ball.setTranslation({ x: t.x, y: PLAY.y + 0.025, z: plateZ + inward * 0.05 }, true);
+        ball.setLinvel({ x: vx, y: 0.15, z: vz }, true);
+      }
     }
 
     // Lane exit. The shooter lane ends in a gate on a real table; here the ball is
