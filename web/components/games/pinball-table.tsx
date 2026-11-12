@@ -396,7 +396,9 @@ const SLING_MAP = {
 // The obtuse corner sits on the arm's elbow, and its two edges straddle the arm's
 // upper run symmetrically, so the bisector is turned onto that run.
 const SLING_CORNER = { x: -0.0367, z: 0.0099 };   // centroid -> obtuse corner
-const SLING_BISECTOR = { x: 0.917, z: -0.399 };   // outward along the obtuse angle
+// One bisector per side: the two plates are turned independently.
+const SLING_BISECTOR_LEFT = { x: 0.017, z: -0.399 };    // left plate
+const SLING_BISECTOR_RIGHT = { x: 0.097, z: 0.399 };    // right plate, mirrored — adjust here
 
 /** Elbow of each arm, where its two runs meet. */
 const ELBOW = { x: 0.232, z: 0.2595 };
@@ -418,7 +420,8 @@ function angleTo(from: { x: number; z: number }, to: { x: number; z: number }) {
 /** Turn the obtuse angle's bisector onto the arm's upper run, corner on the elbow. */
 function slingPlacement(side: 1 | -1) {
   const elbow = side > 0 ? ELBOW : ELBOW_RIGHT;
-  const theta = angleTo(SLING_BISECTOR, ARM_RUN);
+  const bisector = side > 0 ? SLING_BISECTOR_LEFT : SLING_BISECTOR_RIGHT;
+  const theta = angleTo(bisector, ARM_RUN);
   const corner = rotate2(SLING_CORNER, theta);
   return { x: elbow.x - corner.x, z: elbow.z - corner.z, theta };
 }
