@@ -43,9 +43,11 @@ const DIVIDER_FROM = HALF_L - 0.1;
 const DIVIDER_TO = -0.22;
 
 /** The corridor exit, drawn and collided from the same points. */
+const TOP_RAMP = { x: -0.368, z: -0.2 };
+
 const CIRCUIT: [number, number][] = [
   [-0.3, -HALF_W + 0.012],
-  [-0.368, -0.2],
+  [TOP_RAMP.x, TOP_RAMP.z],
 ];
 
 const RAIL = 0.05;
@@ -62,13 +64,18 @@ const BALL_R = 0.0135;
  * The head of the table: a semicircle from the left rail round to the lane divider.
  * A straight wall corners the ball and spits it back; a curve returns it to the field.
  */
-const TOP_ARC: [number, number][] = Array.from(
-  { length: 13 },
-  (_, i): [number, number] => {
-    const a = Math.PI / 2 + (i / 12) * Math.PI;
-    return [-0.31 + 0.23 * Math.cos(a), M(0) + 0.23 * Math.sin(a)];
-  },
-);
+const TOP_ARC: [number, number][] = (() => {
+  const cx = -0.31;
+  const cz = M(0);
+  const r = Math.hypot(TOP_RAMP.x - cx, TOP_RAMP.z - cz);
+  const a0 = Math.PI / 2;
+  let a1 = Math.atan2(TOP_RAMP.z - cz, TOP_RAMP.x - cx);
+  if (a1 < a0) a1 += Math.PI * 2;
+  return Array.from({ length: 13 }, (_, i): [number, number] => {
+    const a = a0 + (i / 12) * (a1 - a0);
+    return [cx + r * Math.cos(a), cz + r * Math.sin(a)];
+  });
+})();
 
 /** Bumper positions, from the layout sheets:
  * field, and two larger ones flanking the middle. Both the visuals and the colliders
@@ -567,7 +574,7 @@ function Pinball({
       }
 
       // Bumpers: one collider each, from the shared list.
-      const bumperForHandle = new Map<number, { x: number; z: number }>();
+      bumperAt.clear();
       BUMPERS.forEach((b) => {
         const z = M(b.dz);
         const c = w.createCollider(
@@ -577,7 +584,7 @@ function Pinball({
             .setRestitution(0.9),
         );
         scoring.current[c.handle] = 100;
-        bumperForHandle.set(c.handle, { x: b.x, z });
+        bumperAt.set(c.handle, { x: b.x, z });
         bumperHandles.current.set(c.handle, BUMPERS.indexOf(b));
       });
 
