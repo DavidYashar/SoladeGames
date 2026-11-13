@@ -1,4 +1,4 @@
-# ARC-ADE
+# SolAde Games
 
 > A skill arcade of three machines, built to run on Bankroll's rails.
 
@@ -8,7 +8,7 @@
 
 ## 1. What this is
 
-ARC-ADE is **content**: three deterministic skill games, presented as a walkable
+SolAde Games is **content**: three deterministic skill games, presented as a walkable
 arcade hall. It is built to be a title that launches on **Bankroll**, using their
 payments, age checks and matchmaking rather than carrying any of that ourselves.
 
@@ -158,4 +158,4 @@ needs Postgres.
 | Payments | **Not implemented, by design** |
 | NFT, token, holder share | **Retired** |
 
-*ARC-ADE, 13 November 2026. Prepared for review by Bankroll.*
+*SolAde Games, 13 November 2026. Prepared for review by Bankroll.*
