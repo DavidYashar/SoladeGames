@@ -11,6 +11,7 @@ import { DT, JengaSim } from "@/lib/jenga/sim";
 import { LAYERS, PLANK, halfExtents, isTopLayer } from "@/lib/jenga/tower";
 import { choosePlacement, chooseVerifiedMove, rankMoves } from "@/lib/jenga/policy";
 import { makeWoodTextures } from "@/lib/jenga/wood";
+import { stackAudio } from "@/lib/stack-tower/audio";
 
 const WOOD_LIGHT = "#ffffff";
 const WOOD_DARK = "#d8c2a4";
@@ -236,6 +237,7 @@ function Scene({
   const settleAndJudge = (side: Side): boolean => {
     sim.settle(2.5);
     if (sim.fallen().length > 0) {
+      stackAudio.collapse();
       finish(side);
       return true;
     }
@@ -258,6 +260,7 @@ function Scene({
   dropHeld.current = (override) => {
     const h = override ?? heldRef.current;
     if (!h || match.current.phase !== "place") return;
+    stackAudio.place(sim.topLayer());
     sim.placeFree(h.x, h.z, h.alongX);
     setHeld(null);
     if (settleAndJudge("player")) return;
@@ -267,6 +270,7 @@ function Scene({
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
       if (!carrying.current) return;
+      void stackAudio.unlock();
       const rect = gl.domElement.getBoundingClientRect();
       const ndc = new THREE.Vector2(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -333,6 +337,7 @@ function Scene({
       const plank = sim.planks.find((p) => p.id === move.plankId);
       pendingAlongX.current = plank ? plank.alongX : true;
       pullLayer.current = move.layer;
+      stackAudio.pull();
       sim.beginPull(move.plankId, 1);
     }
   };
@@ -387,6 +392,7 @@ function Scene({
           finish("machine");
           return;
         }
+        stackAudio.place(sim.topLayer());
         sim.place(choosePlacement(sim, opts));
         if (settleAndJudge("machine")) return;
         startTurn("player");
@@ -410,8 +416,10 @@ function Scene({
   const onPull = (id: number, layer: number, alongX: boolean) => (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
     if (!canPull(layer)) return;
+    void stackAudio.unlock();
     pendingAlongX.current = alongX;
     pullLayer.current = layer;
+    stackAudio.pull();
     sim.beginPull(id, 1);
   };
 
@@ -453,6 +461,13 @@ function Scene({
   };
   useEffect(() => {
     (window as unknown as { __game?: typeof debug.current }).__game = debug.current;
+    (window as unknown as { __stackSound?: () => unknown }).__stackSound = () => stackAudio.report;
+    (window as unknown as { __stackPlay?: (k: string) => void }).__stackPlay = (k) => {
+      if (k === "pull") stackAudio.pull();
+      if (k === "place") stackAudio.place(4);
+      if (k === "collapse") stackAudio.collapse();
+    };
+    (window as unknown as { __stackUnlock?: () => void }).__stackUnlock = () => void stackAudio.unlock();
   }, []);
 
   const held = heldRef.current;
