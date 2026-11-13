@@ -237,7 +237,10 @@ function Scene({
   const settleAndJudge = (side: Side): boolean => {
     sim.settle(2.5);
     if (sim.fallen().length > 0) {
-      stackAudio.collapse();
+      if (!crashPlayed.current) {
+        crashPlayed.current = true;
+        stackAudio.collapse();
+      }
       finish(side);
       return true;
     }
@@ -245,6 +248,8 @@ function Scene({
   };
 
   const placementCount = useRef(0);
+  /** Set once the crash has sounded, so it is not retriggered every frame. */
+  const crashPlayed = useRef(false);
   const beginPlacement = () => {
     placementCount.current += 1;
     const layer = sim.topLayer() + 1;
@@ -354,11 +359,29 @@ function Scene({
       steps += 1;
     }
 
-    for (const t of sim.transforms()) {
+    const transforms = sim.transforms();
+    for (const t of transforms) {
       const mesh = meshes.current.get(t.id);
       if (!mesh) continue;
       mesh.position.set(t.x, t.y, t.z);
       mesh.quaternion.set(t.qx, t.qy, t.qz, t.qw);
+    }
+
+    // Any plank that has dropped out of its layer counts: one or two coming off the top
+    // should be heard, even though only a real collapse ends the match.
+    if (!crashPlayed.current && !sim.pulling && match.current.phase !== "over") {
+      const heights = new Map(transforms.map((tr) => [tr.id, tr.y]));
+      for (const plank of sim.planks) {
+        if (plank.removed) continue;
+        const y = heights.get(plank.id);
+        if (y === undefined) continue;
+        const nominal = PLANK.h / 2 + plank.layer * PLANK.h;
+        if (y < nominal - 0.12) {
+          crashPlayed.current = true;
+          stackAudio.collapse();
+          break;
+        }
+      }
     }
 
     if (m.phase !== "over") {
