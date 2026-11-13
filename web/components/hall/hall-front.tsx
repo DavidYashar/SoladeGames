@@ -7,6 +7,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
+const BADGE_URL = "/models/hall/logo_badge.glb";
 const HALL_URL = "/models/hall/hall.glb";
 
 type Station = {
@@ -71,6 +72,7 @@ function Hall() {
       }),
     [],
   );
+  neonMaterial.userData.base = 9;
 
   const neonHalos = useMemo(
     () =>
@@ -92,6 +94,44 @@ function Hall() {
               toneMapped: false,
             }),
           }) as const,
+      ),
+    [],
+  );
+
+  const logoMaterials = useMemo(
+    () =>
+      ["#22e0ff", "#7b6cf6", "#e33bd6"].map((color) =>
+        Object.assign(
+          new THREE.MeshPhysicalMaterial({
+            color,
+            emissive: new THREE.Color(color),
+            emissiveIntensity: 5,
+            roughness: 0.2,
+            metalness: 0,
+            clearcoat: 1,
+            clearcoatRoughness: 0.1,
+            toneMapped: false,
+          }),
+          { userData: { base: 5 } },
+        ),
+      ),
+    [],
+  );
+
+  const logoHalos = useMemo(
+    () =>
+      ["#22e0ff", "#7b6cf6", "#e33bd6"].map((color) =>
+        Object.assign(
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.4,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            toneMapped: false,
+          }),
+          { userData: { base: 0.4 } },
+        ),
       ),
     [],
   );
@@ -145,6 +185,16 @@ function Hall() {
       emissiveIntensity: 6,
       toneMapped: false,
     });
+    const rimMetal = new THREE.MeshStandardMaterial({
+      color: "#7a6a5c",
+      roughness: 0.45,
+      metalness: 0.35,
+    });
+    const badgeFace = new THREE.MeshStandardMaterial({
+      color: "#221d24",
+      roughness: 0.5,
+      metalness: 0.3,
+    });
     const strip = new THREE.MeshStandardMaterial({
       color: "#ffe1b8",
       emissive: new THREE.Color("#ffb877"),
@@ -192,6 +242,12 @@ function Hall() {
       else if (name.startsWith("Jenga")) mesh.material = timber;
       else if (name === "NeonSign" || name === "NeonFrame") mesh.material = neon;
       else if (name === "FacadeSignText") mesh.material = signGlow;
+      else if (name === "MedallionRim") mesh.material = rimMetal;
+      else if (name === "MedallionFace") mesh.material = badgeFace;
+      else if (name.startsWith("LogoBar")) {
+        const index = Number(name.replace("LogoBar", "")) || 0;
+        mesh.material = logoMaterials[index] ?? logoMaterials[0];
+      }
       else if (name === "FacadeSignBoard") mesh.material = timber;
       else if (name.startsWith("FacadeTrim")) mesh.material = timber;
       else if (name.startsWith("FacadeLamp") || name.startsWith("FacadeBracket")) mesh.material = shade;
@@ -223,8 +279,18 @@ function Hall() {
       }
     }
 
+    // A soft duplicate of each bar, so the mark glows like the sign does.
+    for (let i = 0; i < 3; i += 1) {
+      const bar = clone.getObjectByName(`LogoBar${i}`) as THREE.Mesh | undefined;
+      if (!bar) continue;
+      const shell = new THREE.Mesh(bar.geometry, logoHalos[i]);
+      shell.scale.setScalar(1.12);
+      shell.raycast = () => {};
+      bar.add(shell);
+    }
+
     return clone;
-  }, [scene, grain, boards, screens, neonMaterial, neonHalos]);
+  }, [scene, grain, boards, screens, neonMaterial, neonHalos, logoMaterials, logoHalos]);
 
   return (
     <>
@@ -237,7 +303,12 @@ function Hall() {
         distance={5.5}
         decay={2}
       />
-      <NeonCycle tube={neonMaterial} halos={neonHalos} light={neonLight} />
+      <Badge />
+      <NeonCycle
+        tubes={[neonMaterial, ...logoMaterials]}
+        halos={[...neonHalos, ...logoHalos.map((material) => ({ material, base: 0.4 }))]}
+        light={neonLight}
+      />
     </>
   );
 }
@@ -344,6 +415,9 @@ export function HallFront() {
         <pointLight position={[-2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7.5} decay={2} />
         <pointLight position={[2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7} decay={2} />
 
+        {/* A soft wash on the badge above the door. */}
+        <pointLight position={[0, 6.1, -9.6]} intensity={9} color="#ffd2a1" distance={6} decay={2} />
+
         {/* The two lamps beside the door. */}
         <pointLight position={[-3.9, 3.3, -8.9]} intensity={12} color="#ffcf9a" distance={7} decay={2} />
         <pointLight position={[3.9, 3.3, -8.9]} intensity={12} color="#ffcf9a" distance={7} decay={2} />
@@ -435,13 +509,13 @@ export function HallFront() {
  * tube stutters as it strikes, which is what makes it read as gas rather than a lamp.
  */
 function NeonCycle({
-  tube,
+  tubes,
   halos,
   light,
 }: {
-  tube: THREE.MeshPhysicalMaterial;
+  tubes: readonly (THREE.MeshPhysicalMaterial | THREE.MeshStandardMaterial)[];
   halos: readonly { material: THREE.MeshBasicMaterial; base: number }[];
-  light: React.RefObject<THREE.PointLight | null>;
+  light?: React.RefObject<THREE.PointLight | null>;
 }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime % 12;
@@ -462,10 +536,13 @@ function NeonCycle({
     // A lit tube is never perfectly calm.
     const hum = level > 0 ? 1 + Math.sin(clock.elapsedTime * 43) * 0.025 : 1;
 
-    tube.emissiveIntensity = 9 * level * hum;
+    for (const tube of tubes) {
+      const base = (tube.userData.base as number | undefined) ?? 9;
+      tube.emissiveIntensity = base * level * hum;
+    }
     for (const halo of halos) halo.material.opacity = halo.base * level;
     // The wall behind the sign catches the light while it is on, and just a hint when off.
-    if (light.current) light.current.intensity = 7 * level;
+    if (light?.current) light.current.intensity = 7 * level;
   });
 
   return null;
@@ -496,6 +573,53 @@ function Lamp({
       <primitive object={target} />
       <pointLight position={at} intensity={7} color="#ffd9a6" distance={4.5} decay={2} />
     </>
+  );
+}
+
+/** The Solana badge above the door: a 3D medallion carrying the supplied artwork. */
+function Badge() {
+  const art = useTexture("/textures/solana-badge.png");
+  art.colorSpace = THREE.SRGBColorSpace;
+  art.anisotropy = 8;
+
+  const faceMaterial = useMemo(() => {
+    const material = new THREE.MeshStandardMaterial({
+      map: art,
+      transparent: true,
+      roughness: 0.5,
+      metalness: 0.15,
+      emissiveMap: art,
+      emissive: new THREE.Color("#ffffff"),
+      emissiveIntensity: 0.55,
+      toneMapped: false,
+    });
+    material.userData.base = 0.55;
+    return material;
+  }, [art]);
+
+  const materials = useMemo(() => {
+    const rim = new THREE.MeshStandardMaterial({
+      color: "#6f6154",
+      roughness: 0.45,
+      metalness: 0.4,
+    });
+    const face = faceMaterial;
+    const back = new THREE.MeshStandardMaterial({ color: "#2a2622", roughness: 0.6, metalness: 0.3 });
+    return [rim, face, back];
+  }, [art, faceMaterial]);
+
+  return (
+    <group position={[0, 5.95, -8.46]}>
+      {/* The body of the medallion: a disc with real thickness. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} material={materials}>
+        <cylinderGeometry args={[0.95, 0.95, 0.24, 64]} />
+      </mesh>
+      {/* The artwork, laid on the face so it sits inside the rim. */}
+      <mesh position={[0, 0.001, -0.121]} rotation={[0, Math.PI, 0]} material={faceMaterial}>
+        <circleGeometry args={[0.9, 64]} />
+      </mesh>
+      <NeonCycle tubes={[faceMaterial]} halos={[]} />
+    </group>
   );
 }
 
