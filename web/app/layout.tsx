@@ -38,24 +38,24 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   ),
   title: {
-    default: "ARC_ADE — Skill arcade on Arc",
-    template: "%s · ARC_ADE",
+    default: "SolAde Games · three skill games",
+    template: "%s · SolAde Games",
   },
   description:
-    "Skill arcade and daily puzzle league. Practice free on Solana devnet.",
-  applicationName: "ARC_ADE",
+    "Three skill games in a 3D arcade hall. Free to play on Solana devnet.",
+  applicationName: "SolAde Games",
   openGraph: {
-    title: "ARC_ADE — Skill arcade on Arc",
+    title: "SolAde Games",
     description:
-      "Four cabinet machines, one daily puzzle league. Practice free on Solana devnet.",
-    siteName: "ARC_ADE",
+      "Three skill games in a 3D arcade hall. Free to play on Solana devnet.",
+    siteName: "SolAde Games",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ARC_ADE — Skill arcade on Arc",
+    title: "SolAde Games",
     description:
-      "Four cabinet machines, one daily puzzle league. Practice free on Solana devnet.",
+      "Three skill games in a 3D arcade hall. Free to play on Solana devnet.",
   },
 };
 
