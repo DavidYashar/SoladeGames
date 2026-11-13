@@ -12,6 +12,8 @@ export class StackAudio {
   private lastKnockAt = 0;
   private collapseBuffer: AudioBuffer | null = null;
   private collapseOnset = 0;
+  private placeBuffer: AudioBuffer | null = null;
+  private placeOnset = 0;
   private loading = false;
 
   get state(): string {
@@ -51,6 +53,7 @@ export class StackAudio {
 
     if (this.ctx.state === "suspended") await this.ctx.resume();
     void this.loadCollapse();
+    void this.loadPlace();
   }
 
   /** The recorded collapse. Falls back to the synthesised one if it cannot load. */
@@ -66,6 +69,21 @@ export class StackAudio {
       this.collapseOnset = this.findOnset(buffer);
     } catch {
       // Keep the synthesised collapse.
+    }
+  }
+
+  /** The recorded plank being set down. */
+  private async loadPlace(): Promise<void> {
+    if (!this.ctx || this.placeBuffer) return;
+    try {
+      const response = await fetch("/audio/stack/place.mp3");
+      if (!response.ok) return;
+      const data = await response.arrayBuffer();
+      const buffer = await this.ctx.decodeAudioData(data);
+      this.placeBuffer = buffer;
+      this.placeOnset = this.findOnset(buffer);
+    } catch {
+      // Keep the synthesised knock.
     }
   }
 
@@ -200,6 +218,26 @@ export class StackAudio {
 
     this.plays.place += 1;
     const at = this.ctx.currentTime;
+
+    if (this.placeBuffer) {
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.placeBuffer;
+      // A touch of pitch variation so repeated placements do not sound looped.
+      source.playbackRate.value = 0.97 + Math.random() * 0.06;
+
+      const envelope = this.ctx.createGain();
+      envelope.gain.setValueAtTime(0.9, at);
+      // Clipped to half a second: this is a knock, not a footstep to listen through.
+      envelope.gain.setValueAtTime(0.9, at + 0.3);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.5);
+
+      source.connect(envelope);
+      envelope.connect(this.master!);
+      source.start(at, this.placeOnset);
+      source.stop(at + 0.52);
+      return;
+    }
+
     const pitch = 0.95 + Math.min(12, layer) * 0.02;
     this.knock(at, pitch, 0.34);
   }
