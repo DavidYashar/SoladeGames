@@ -11,6 +11,7 @@ import { DT, JengaSim } from "@/lib/jenga/sim";
 import { LAYERS, PLANK, halfExtents, isTopLayer } from "@/lib/jenga/tower";
 import { choosePlacement, chooseVerifiedMove, rankMoves } from "@/lib/jenga/policy";
 import { makeWoodTextures } from "@/lib/jenga/wood";
+import { RoundedBoxGeometry } from "three-stdlib";
 import { stackAudio } from "@/lib/stack-tower/audio";
 
 const WOOD_LIGHT = "#ffffff";
@@ -176,6 +177,23 @@ function TableUnderTower() {
     [legMap],
   );
 
+  // A rounded slab, with the board projected onto it from above: the box UVs would
+  // squeeze the photograph, and the edges were too sharp.
+  const slab = useMemo(() => {
+    const geometry = new RoundedBoxGeometry(17.8, 0.5, 17.8, 4, 0.18);
+    const position = geometry.attributes.position;
+    const uv = geometry.attributes.uv;
+    for (let i = 0; i < position.count; i += 1) {
+      uv.setXY(
+        i,
+        (position.getX(i) + 8.9) / 17.8,
+        (position.getZ(i) + 8.9) / 17.8,
+      );
+    }
+    uv.needsUpdate = true;
+    return geometry;
+  }, []);
+
   const legs: [number, number][] = [
     [8.1, 8.1],
     [8.1, -8.1],
@@ -187,16 +205,22 @@ function TableUnderTower() {
     <group>
       {/* Top slab: a box, not a rounded box, because a box maps the board across each
           face properly. Upper face flush with y = 0. */}
-      <mesh position={[0, -0.25, 0]} castShadow receiveShadow>
-        <boxGeometry args={[17.8, 0.5, 17.8]} />
+      <mesh geometry={slab} position={[0, -0.25, 0]} castShadow receiveShadow>
         <primitive object={top} attach="material" />
       </mesh>
 
       {legs.map(([lx, lz]) => (
-        <mesh key={`leg-${lx}-${lz}`} position={[lx, -3.1, lz]} castShadow receiveShadow>
-          <boxGeometry args={[0.85, 5.2, 0.85]} />
+        <RoundedBox
+          key={`leg-${lx}-${lz}`}
+          args={[0.85, 5.2, 0.85]}
+          radius={0.07}
+          smoothness={3}
+          position={[lx, -3.1, lz]}
+          castShadow
+          receiveShadow
+        >
           <primitive object={timber} attach="material" />
-        </mesh>
+        </RoundedBox>
       ))}
     </group>
   );
