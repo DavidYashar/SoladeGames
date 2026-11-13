@@ -1,3 +1,10 @@
+> **In development.** The business model is not decided. Nothing below is a
+> commitment, a forecast or a claim about what ships: it is the shape we were
+> exploring, kept so we can decide on it later with the numbers in front of us.
+>
+> Current product direction: [README](../../README.md). Three games, built to run on
+> Bankroll's rails, taking no cut of game revenue.
+
 # I-market Games — Full Project Design
 
 > Two computer-only, revenue-generating games on Arc: **Daily Puzzle League** and **Arcade King**.

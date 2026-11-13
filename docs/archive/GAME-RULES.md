@@ -1,3 +1,10 @@
+> **Archived.** This document describes the retired plan: our own USDC rails, a 25%
+> NFT holder share and a 15% platform take, on Arc Testnet, with four cabinets
+> including Bubble Pop. None of it is current, and none of it is built.
+>
+> The product direction now is in the [README](../../README.md): three games, built to
+> run on Bankroll's rails, taking no cut of game revenue.
+
 > **SUPERSEDED.** This describes the earlier sliding-stack game, which was deleted.
 > The current game is documented in [STACK-TOWER.md](./STACK-TOWER.md).
 

@@ -1,3 +1,10 @@
+> **Archived.** This document describes the retired plan: our own USDC rails, a 25%
+> NFT holder share and a 15% platform take, on Arc Testnet, with four cabinets
+> including Bubble Pop. None of it is current, and none of it is built.
+>
+> The product direction now is in the [README](../../README.md): three games, built to
+> run on Bankroll's rails, taking no cut of game revenue.
+
 # ARC-ADE: Arcade Economy and NFT Game Theory Plan
 
 > Strategy document for the ARC-ADE testnet season, whitelist campaign, paid tournaments, and game-related NFT collection.

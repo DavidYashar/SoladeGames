@@ -1,7 +1,7 @@
 # Stack Tower: current state
 
 Last updated 2026-11-11. This describes the game **as it exists in code today**.
-`docs/GAME-RULES.md` is superseded: it describes the earlier sliding-stack game, which
+`docs/archive/GAME-RULES.md` is superseded: it describes the earlier sliding-stack game, which
 was deleted.
 
 ---

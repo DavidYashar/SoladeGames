@@ -3,7 +3,7 @@
 Last updated 2026-11-13. This describes the game **as it exists in code today**: a
 brick-breaker played on a billiard table.
 
-`docs/GAME-RULES.md` describes the earlier canvas version and is superseded.
+`docs/archive/GAME-RULES.md` describes the earlier canvas version and is superseded.
 
 ---
 
