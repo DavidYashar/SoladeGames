@@ -563,6 +563,10 @@ function Physics({
   const world = useRef<RAPIER.World | null>(null);
   const body = useRef<RAPIER.RigidBody | null>(null);
   const lastVelocity = useRef({ x: 0, z: 0 });
+  /** Ball position last frame, for the swept brick test. */
+  const lastPosition = useRef({ x: 0, z: 0 });
+  /** Brick id -> when it last took a hit, so one contact is not counted twice. */
+  const brickHitAt = useRef(new Map<number, number>());
   const ballCollider = useRef(0);
   const byHandle = useRef(new Map<number, number>());
   const colliderForBrick = useRef(new Map<number, RAPIER.Collider>());
@@ -757,8 +761,8 @@ function Physics({
             }
           }
 
-          const brickId = brickForCollider.current.get(other);
-          if (brickId !== undefined) hitRef.current(brickId);
+          // Brick hits are detected by proximity below, not by these events: a ball
+          // clipping a side or a corner often separates before an event is delivered.
         });
       }
 
@@ -774,6 +778,47 @@ function Physics({
         );
         b.setLinvel({ x: -BALL_SPEED, y: 0, z: 0 }, true);
       }
+    }
+
+    // Brick contact by swept proximity.
+    //
+    // Rapier's contact events are reliable for a square hit but unreliable for a graze,
+    // and at 7 m/s the ball moves ~120 mm per frame, so a single position test can step
+    // straight past a brick. Walking the segment between frames fixes both: a side or
+    // corner contact counts, and nothing is skipped at speed.
+    {
+      const now = performance.now();
+      const pos = b.translation();
+      const prev = lastPosition.current;
+      const steps = Math.max(
+        1,
+        Math.ceil(Math.hypot(pos.x - prev.x, pos.z - prev.z) / 0.015),
+      );
+      const reach = BALL_R + 0.007;
+
+      for (const brick of bricks) {
+        const collider = colliderForBrick.current.get(brick.id);
+        if (!collider) continue;
+        if (now - (brickHitAt.current.get(brick.id) ?? 0) < 140) continue;
+
+        const at = collider.translation();
+        let contact = false;
+        for (let s = 1; s <= steps && !contact; s += 1) {
+          const f = s / steps;
+          const px = prev.x + (pos.x - prev.x) * f;
+          const pz = prev.z + (pos.z - prev.z) * f;
+          const dx = Math.max(0, Math.abs(px - at.x) - BRICK.d / 2);
+          const dz = Math.max(0, Math.abs(pz - at.z) - BRICK.w / 2);
+          if (Math.hypot(dx, dz) <= reach) contact = true;
+        }
+
+        if (contact) {
+          brickHitAt.current.set(brick.id, now);
+          hitRef.current(brick.id);
+        }
+      }
+
+      lastPosition.current = { x: pos.x, z: pos.z };
     }
 
     // The ball is audible as it rolls, and thumps when it is knocked off course: that
