@@ -123,12 +123,6 @@ function Hall() {
     const brass = new THREE.MeshStandardMaterial({ color: "#c9a24c", roughness: 0.3, metalness: 0.95 });
     const bottle = new THREE.MeshPhysicalMaterial({ color: "#2a3a22", roughness: 0.15, transmission: 0.6, thickness: 0.3, transparent: true, opacity: 0.85 });
     const shade = new THREE.MeshStandardMaterial({ color: "#2b2119", roughness: 0.42, metalness: 0.75 });
-    const bulb = new THREE.MeshStandardMaterial({
-      color: "#fff6e2",
-      emissive: new THREE.Color("#ffdcae"),
-      emissiveIntensity: 6,
-      toneMapped: false,
-    });
     const felt = new THREE.MeshStandardMaterial({ color: "#1e7a52", roughness: 0.92, metalness: 0.02 });
     const cabinet = new THREE.MeshStandardMaterial({ color: "#241a2c", roughness: 0.42, metalness: 0.35 });
     const neon = neonMaterial;
@@ -137,6 +131,12 @@ function Hall() {
     const glyphB = new THREE.MeshBasicMaterial({ map: screens[1], toneMapped: false });
     const glyphC = new THREE.MeshBasicMaterial({ map: screens[2], toneMapped: false });
     const ball = new THREE.MeshStandardMaterial({ color: "#d8d2c4", roughness: 0.35, metalness: 0.2 });
+    const strip = new THREE.MeshStandardMaterial({
+      color: "#ffe1b8",
+      emissive: new THREE.Color("#ffb877"),
+      emissiveIntensity: 3,
+      toneMapped: false,
+    });
     const leather = new THREE.MeshStandardMaterial({ color: "#7a3b1f", roughness: 0.45, metalness: 0.05 });
     const tumbler = new THREE.MeshPhysicalMaterial({
       color: "#dfeef2",
@@ -165,7 +165,6 @@ function Hall() {
       else if (name.startsWith("BarBottle")) mesh.material = bottle;
       else if (name.startsWith("BarRail")) mesh.material = brass;
       else if (name.startsWith("LampShade")) mesh.material = shade;
-      else if (name.startsWith("LampBulb")) mesh.material = bulb;
       else if (name.startsWith("LampCord")) mesh.material = timber;
       else if (name.startsWith("PoolFelt")) mesh.material = felt;
       else if (name.startsWith("PoolBalls")) mesh.material = ball;
@@ -180,7 +179,7 @@ function Hall() {
       else if (name === "NeonSign" || name === "NeonFrame") mesh.material = neon;
       else if (name === "SignFrame") mesh.material = cabinet;
       else if (name.startsWith("BarPlank") || name === "BarWallPlanks") mesh.material = barWood;
-      else if (name.startsWith("BarLed") || name.startsWith("BarStrip")) mesh.material = bulb;
+      else if (name.startsWith("BarLed") || name.startsWith("BarStrip")) mesh.material = strip;
       else if (name.startsWith("BarShaker")) mesh.material = brass;
       else if (name.startsWith("BarPlant")) mesh.material = felt;
       else if (name.startsWith("StoolSeat")) mesh.material = leather;

@@ -197,7 +197,6 @@ def build_bar(parts):
 def build_lamps(parts):
     """Three cone pendants over the counter."""
     shades = []
-    bulbs = []
     cords = []
     # One pendant over each machine: pinball, pool table, jenga table.
     for i, (x, y) in enumerate(((-6.4, -3.2), (0.0, -1.4), (6.2, -3.2))):
@@ -207,10 +206,8 @@ def build_lamps(parts):
         cone = bpy.context.active_object
         cone.name = f"Shade{i}"
         shades.append(cone)
-        bulbs.append(cyl(f"Bulb{i}", 0.14, 0.12, (x, y, 3.34), vertices=14))
         cords.append(box(f"Cord{i}", (0.03, 0.03, 1.35), (x, y, 4.5)))
     parts.append(join(shades, "LampShades"))
-    parts.append(join(bulbs, "LampBulbs"))
     parts.append(join(cords, "LampCords"))
 
 
