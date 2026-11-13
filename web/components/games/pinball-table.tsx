@@ -541,6 +541,47 @@ function FlipperMesh({ side }: { side: 1 | -1 }) {
 
 const LANE_ARROWS = [0.3, 0.19, 0.08];
 
+/** A chevron pointing +x: two thick arms meeting at a point, notched at the back. */
+function chevronGeometry() {
+  const shape = new THREE.Shape();
+  shape.moveTo(0.034, 0);        // tip
+  shape.lineTo(0.008, 0.032);    // outer top
+  shape.lineTo(-0.03, 0.032);    // back top
+  shape.lineTo(-0.01, 0);        // notch, well behind the tip
+  shape.lineTo(-0.03, -0.032);   // back bottom
+  shape.lineTo(0.008, -0.032);   // outer bottom
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
+/** Two chevron inlays above the top bumper, in the colours of the reference sheet. */
+function TopArrows() {
+  const geometry = useMemo(() => chevronGeometry(), []);
+  const arrows = useMemo(
+    () => [
+      { z: M(-0.128), colour: "#22a7e0", shade: "#12659a" },
+      { z: M(0.128), colour: "#e8403f", shade: "#9d211f" },
+    ],
+    [],
+  );
+
+  return (
+    <group>
+      {arrows.map(({ z, colour, shade }) => (
+        <group key={z} position={[-0.455, PLAY.y + 0.0088, z]}>
+          {/* The darker offset reads as the raised edge in the artwork. */}
+          <mesh geometry={geometry} position={[0.006, -0.0004, 0.004]} rotation={[-Math.PI / 2, 0, Math.PI]}>
+            <meshBasicMaterial color={shade} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+          <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, Math.PI]}>
+            <meshBasicMaterial color={colour} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 /** Three chevrons on the shooter lane floor, blinking red and blue up the chute. */
 function LaneArrows() {
   const mats = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
@@ -1469,6 +1510,7 @@ function Cabinet() {
       <LaneWall side={1} />
       <LaneWall side={-1} />
 
+      <TopArrows />
       <TopBumper />
       <TableWalls />
 
