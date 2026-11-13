@@ -86,6 +86,15 @@ function Hall() {
     const glyphB = new THREE.MeshBasicMaterial({ map: screens[1], toneMapped: false });
     const glyphC = new THREE.MeshBasicMaterial({ map: screens[2], toneMapped: false });
     const ball = new THREE.MeshStandardMaterial({ color: "#d8d2c4", roughness: 0.35, metalness: 0.2 });
+    const leather = new THREE.MeshStandardMaterial({ color: "#7a3b1f", roughness: 0.45, metalness: 0.05 });
+    const tumbler = new THREE.MeshPhysicalMaterial({
+      color: "#dfeef2",
+      roughness: 0.06,
+      transmission: 0.88,
+      thickness: 0.2,
+      transparent: true,
+      opacity: 0.55,
+    });
 
     const clone = scene.clone(true);
     clone.traverse((child) => {
@@ -118,6 +127,14 @@ function Hall() {
       else if (name.startsWith("JengaTop")) mesh.material = barWood;
       else if (name.startsWith("Jenga")) mesh.material = timber;
       else if (name === "NeonSign") mesh.material = neon;
+      else if (name === "SignFrame") mesh.material = cabinet;
+      else if (name.startsWith("BarPlank") || name === "BarWallPlanks") mesh.material = barWood;
+      else if (name.startsWith("BarLed") || name.startsWith("BarStrip")) mesh.material = bulb;
+      else if (name.startsWith("BarShaker")) mesh.material = brass;
+      else if (name.startsWith("BarPlant")) mesh.material = felt;
+      else if (name.startsWith("StoolSeat")) mesh.material = leather;
+      else if (name.startsWith("Stool")) mesh.material = cabinet;
+      else if (name.startsWith("BarGlassware")) mesh.material = tumbler;
       else mesh.material = timber;
       void glyphA;
       void glyphB;

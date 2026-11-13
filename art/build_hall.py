@@ -106,46 +106,145 @@ def build_room(parts):
 
 
 def build_bar(parts):
-    bar_y = -ROOM_D / 2 + 1.9
-    top = box("BarTop", (9.0, 1.0, 0.12), (0, bar_y, 1.12))
-    bevel(top, 0.03, 3)
-    body = box("BarBody", (8.7, 0.85, 1.05), (0, bar_y - 0.05, 0.53))
-    parts += [top, body]
+    """Counter, back bar and everything standing on them, after the reference photo."""
+    wall_y = -ROOM_D / 2
+    bar_y = wall_y + 3.1
+    bar_len = 11.0
 
-    back = box("BackBar", (9.0, 0.4, 3.4), (0, -ROOM_D / 2 + 0.35, 1.7))
+    # ---------------------------------------------------------------- counter
+    top = box("BarTop", (bar_len, 1.15, 0.14), (0, bar_y, 1.12))
+    bevel(top, 0.035, 3)
+    parts.append(top)
+
+    # Front made of vertical planks with slim gaps, as in the photo.
+    planks = []
+    count = 26
+    for i in range(count):
+        pxx = -bar_len / 2 + 0.12 + i * ((bar_len - 0.24) / (count - 1))
+        planks.append(box(f"BarPlank{i}", (0.36, 0.06, 1.02), (pxx, bar_y + 0.52, 0.53)))
+    parts.append(join(planks, "BarPlanks"))
+
+    body = box("BarBody", (bar_len, 0.9, 1.02), (0, bar_y + 0.02, 0.53))
+    parts.append(body)
+
+    # The strip under the counter lip that washes the planks.
+    led = box("BarLed", (bar_len - 0.3, 0.04, 0.04), (0, bar_y + 0.5, 0.99))
+    parts.append(led)
+
+    # ---------------------------------------------------------------- back bar
+    back = box("BackBar", (bar_len, 0.18, 3.5), (0, wall_y + 0.32, 1.75))
     parts.append(back)
 
-    shelves = []
-    for i, z in enumerate((1.35, 1.95, 2.55)):
-        s = box(f"BarShelf{i}", (8.2, 0.42, 0.07), (0, -ROOM_D / 2 + 0.62, z))
-        bevel(s, 0.01, 2)
-        shelves.append(s)
-    parts.append(join(shelves, "BarShelves"))
+    # The back wall's own vertical planks.
+    wall_planks = []
+    for i in range(34):
+        pxx = -bar_len / 2 + 0.15 + i * ((bar_len - 0.3) / 33)
+        wall_planks.append(box(f"WallPlank{i}", (0.3, 0.05, 3.2), (pxx, wall_y + 0.42, 1.75)))
+    parts.append(join(wall_planks, "BarWallPlanks"))
 
+    shelf_hi = box("BarShelf0", (bar_len - 1.2, 0.44, 0.09), (0, wall_y + 0.62, 2.34))
+    shelf_lo = box("BarShelf1", (bar_len - 1.2, 0.44, 0.09), (0, wall_y + 0.62, 1.76))
+    for s in (shelf_hi, shelf_lo):
+        bevel(s, 0.012, 2)
+        parts.append(s)
+
+    # Lit strips under each shelf.
+    strip_hi = box("BarStrip0", (bar_len - 1.6, 0.03, 0.03), (0, wall_y + 0.56, 2.29))
+    strip_lo = box("BarStrip1", (bar_len - 1.6, 0.03, 0.03), (0, wall_y + 0.56, 1.71))
+    parts.append(join([strip_hi, strip_lo], "BarStrips"))
+
+    # ---------------------------------------------------------------- bottles and glass
     bottles = []
-    for i in range(16):
-        x = -3.8 + i * 0.5
-        h = 0.3 + (0.05 if i % 3 == 0 else 0)
-        z = 1.42 if i % 2 == 0 else 2.02
-        bottles.append(cyl(f"Bottle{i}", 0.05, h, (x, -ROOM_D / 2 + 0.62, z + h / 2), vertices=12))
+    for i in range(19):
+        x = -4.7 + i * 0.52
+        h = 0.32 + (0.05 if i % 4 == 0 else 0.0)
+        bottles.append(
+            join(
+                [
+                    cyl(f"BottleB{i}", 0.052, h * 0.64, (x, wall_y + 0.62, 2.38 + h * 0.32), vertices=12),
+                    cyl(f"BottleN{i}", 0.022, h * 0.3, (x, wall_y + 0.62, 2.38 + h * 0.82), vertices=10),
+                ],
+                f"Bottle{i}",
+            )
+        )
     parts.append(join(bottles, "BarBottles"))
 
-    rail = cyl("BarRail", 0.035, 8.4, (0, bar_y + 0.6, 0.22), rot=(0, math.pi / 2, 0), vertices=16)
-    smooth(rail)
-    parts.append(rail)
+    # A few special bottles and tumblers on the lower shelf.
+    tumbler = []
+    for i in range(12):
+        x = -1.9 + i * 0.34
+        tumbler.append(cyl(f"Tumbler{i}", 0.05, 0.13, (x, wall_y + 0.62, 1.88), vertices=12))
+    parts.append(join(tumbler, "BarGlassware"))
+
+    # A shaker and a small plant on the counter.
+    shaker = cyl("BarShaker", 0.075, 0.28, (-3.4, bar_y - 0.1, 1.28), vertices=16)
+    parts.append(shaker)
+    pot = cyl("BarPlantPot", 0.13, 0.2, (3.1, bar_y - 0.15, 1.24), vertices=14)
+    leaves = []
+    for i in range(9):
+        a = i * 0.7
+        leaves.append(
+            box(
+                f"Leaf{i}",
+                (0.05, 0.05, 0.3),
+                (3.1 + math.cos(a) * 0.12, bar_y - 0.15 + math.sin(a) * 0.12, 1.45),
+                rot=(0.3 * math.sin(a), 0.3 * math.cos(a), 0),
+            )
+        )
+    parts += [pot, join(leaves, "BarPlantLeaves")]
 
 
 def build_lamps(parts):
+    """Three cone pendants over the counter."""
     shades = []
     bulbs = []
     cords = []
-    for i, x in enumerate((-4.4, 0.0, 4.4)):
-        shades.append(cyl(f"Shade{i}", 0.42, 0.34, (x, -2.4, 3.55), vertices=20))
-        bulbs.append(cyl(f"Bulb{i}", 0.16, 0.1, (x, -2.4, 3.36), vertices=16))
-        cords.append(box(f"Cord{i}", (0.03, 0.03, 1.25), (x, -2.4, 4.35)))
+    for i, x in enumerate((-3.6, 0.0, 3.6)):
+        bpy.ops.mesh.primitive_cone_add(
+            vertices=28, radius1=0.52, radius2=0.16, depth=0.4, location=(x, -4.4, 3.55)
+        )
+        cone = bpy.context.active_object
+        cone.name = f"Shade{i}"
+        shades.append(cone)
+        bulbs.append(cyl(f"Bulb{i}", 0.14, 0.12, (x, -4.4, 3.34), vertices=14))
+        cords.append(box(f"Cord{i}", (0.03, 0.03, 1.35), (x, -4.4, 4.5)))
     parts.append(join(shades, "LampShades"))
     parts.append(join(bulbs, "LampBulbs"))
     parts.append(join(cords, "LampCords"))
+
+
+def build_stools(parts):
+    """Four leather stools at the counter."""
+    seats = []
+    frames = []
+    for i, x in enumerate((-3.2, -1.1, 1.1, 3.2)):
+        seats.append(cyl(f"StoolSeat{i}", 0.26, 0.13, (x, -4.05, 0.9), vertices=24))
+        legs = []
+        for dx, dy in ((-0.18, -0.18), (0.18, -0.18), (-0.18, 0.18), (0.18, 0.18)):
+            legs.append(cyl(f"StoolLeg{i}", 0.025, 0.84, (x + dx, -4.05 + dy, 0.42), vertices=8))
+        ring = cyl(f"StoolRing{i}", 0.2, 0.02, (x, -4.05, 0.28), vertices=18)
+        frames += legs + [ring]
+    parts.append(join(seats, "StoolSeats"))
+    parts.append(join(frames, "StoolFrames"))
+
+
+def build_sign(parts):
+    """Framed neon beside the back bar, facing the room."""
+    frame = box("SignFrame", (2.9, 0.12, 2.6), (4.9, -ROOM_D / 2 + 0.5, 2.45))
+    parts.append(frame)
+
+    # Text lies in the XZ plane facing -Y, which is the way the room looks at it.
+    # Normal to +Y (facing the room), up to +Z, reading along -X for a viewer at +Y.
+    bpy.ops.object.text_add(location=(4.9, -ROOM_D / 2 + 0.62, 2.75), rotation=(math.pi / 2, 0, math.pi))
+    text = bpy.context.active_object
+    text.name = "NeonSign"
+    text.data.body = "GAME\nBAR"
+    text.data.align_x = "CENTER"
+    text.data.size = 0.52
+    text.data.extrude = 0.03
+    bpy.context.view_layer.objects.active = text
+    bpy.ops.object.convert(target="MESH")
+    parts.append(bpy.context.active_object)
 
 
 def build_pool_table(parts, at):
@@ -216,23 +315,6 @@ def build_jenga_table(parts, at):
     parts.append(join(planks, "JengaPlanks"))
 
 
-def build_sign(parts):
-    bpy.ops.object.text_add(location=(0, -ROOM_D / 2 + 1.3, 4.15))
-    text = bpy.context.active_object
-    text.name = "NeonSign"
-    text.data.body = "PLAY  DRINK  PLAY"
-    text.data.align_x = "CENTER"
-    text.data.size = 0.7
-    text.data.extrude = 0.03
-    bpy.context.view_layer.objects.active = text
-    bpy.ops.object.convert(target="MESH")
-    obj = bpy.context.active_object
-    obj.scale.x = -1
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.transform_apply(scale=True)
-    parts.append(obj)
-
-
 def build_hotspots(parts):
     """Invisible click targets, one per station."""
     for name, loc, size in (
@@ -252,6 +334,7 @@ def main() -> None:
     build_pool_table(parts, (0.0, -1.4))
     build_pinball(parts, (-6.4, -3.2))
     build_jenga_table(parts, (6.2, -3.2))
+    build_stools(parts)
     build_sign(parts)
     build_hotspots(parts)
 
