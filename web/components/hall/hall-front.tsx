@@ -280,6 +280,13 @@ function Rig({
     const k = Math.min(1, delta * 2.4);
     pos.current.lerp(target.current, k);
     lookNow.current.lerp(targetLook.current, k);
+
+    // An asymptotic lerp never arrives, and a camera that creeps forever makes every
+    // thin edge in the room shimmer. Land it properly and stop.
+    if (pos.current.distanceTo(target.current) < 0.002) pos.current.copy(target.current);
+    if (lookNow.current.distanceTo(targetLook.current) < 0.002)
+      lookNow.current.copy(targetLook.current);
+
     camera.position.copy(pos.current);
     camera.lookAt(lookNow.current);
     void to;
