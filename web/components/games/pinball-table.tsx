@@ -798,6 +798,8 @@ function Pinball({
 
   useEffect(() => {
     let cancelled = false;
+    let myWorld: RAPIER.World | null = null;
+    let myBall: RAPIER.RigidBody | null = null;
 
     void (async () => {
       await RAPIER.init();
@@ -999,6 +1001,8 @@ function Pinball({
       }
 
       world.current = w;
+      myWorld = w;
+      myBall = ball;
       events.current = new RAPIER.EventQueue(true);
       shared.ball = ball;
       liveBall.current = ball;
@@ -1137,19 +1141,19 @@ function Pinball({
       cancelled = true;
       cleanups.current.forEach((fn) => fn());
       cleanups.current = [];
-      world.current?.free();
-      world.current = null;
-      shared.ball = null;
+      myWorld?.free();
+      if (world.current === myWorld) world.current = null;
+      if (shared.ball === myBall) shared.ball = null;
       // Drop the live handle too, and the debug hooks with it: a stale handle points
       // into freed wasm memory and throws on the next read.
-      liveBall.current = null;
-      const w = window as unknown as Record<string, unknown>;
-      delete w.__pin;
-      delete w.__kick;
-      delete w.__place;
-      delete w.__at;
-      delete w.__near;
-      delete w.__ghost;
+      if (liveBall.current === myBall) liveBall.current = null;
+      const win = window as unknown as Record<string, unknown>;
+      delete win.__pin;
+      delete win.__kick;
+      delete win.__place;
+      delete win.__at;
+      delete win.__near;
+      delete win.__ghost;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1170,7 +1174,7 @@ function Pinball({
 
   useFrame((_, delta) => {
     const w = world.current;
-    const ball = shared.ball;
+    const ball = liveBall.current;
     if (!w || !ball) return;
 
     if (shared.combo > 0 && performance.now() - shared.comboAt > 2600) {
@@ -1211,10 +1215,19 @@ function Pinball({
 
     acc.current += Math.min(delta, 0.05);
     let steps = 0;
-    while (acc.current >= w.timestep && steps < 12) {
-      w.step(events.current ?? undefined);
-      acc.current -= w.timestep;
-      steps += 1;
+    try {
+      while (acc.current >= w.timestep && steps < 12) {
+        w.step(events.current ?? undefined);
+        acc.current -= w.timestep;
+        steps += 1;
+      }
+    } catch {
+      // The world was freed underneath us (hot reload). Drop the handles so this loop
+      // stops touching it; the effect rebuilds them on its next run.
+      world.current = null;
+      liveBall.current = null;
+      shared.ball = null;
+      return;
     }
 
     const queue = events.current;
