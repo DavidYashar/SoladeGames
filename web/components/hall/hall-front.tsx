@@ -60,11 +60,34 @@ function Hall() {
   const neonMaterial = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#ff2d55",
-        emissive: new THREE.Color("#ff2d55"),
-        emissiveIntensity: 4,
+        color: "#ff4d8d",
+        emissive: new THREE.Color("#ff2d7a"),
+        emissiveIntensity: 5,
         toneMapped: false,
       }),
+    [],
+  );
+
+  const neonHalos = useMemo(
+    () =>
+      [
+        [1.06, 0.45],
+        [1.16, 0.17],
+      ].map(
+        ([scale, opacity]) =>
+          ({
+            scale,
+            base: opacity,
+            material: new THREE.MeshBasicMaterial({
+              color: "#ff2d7a",
+              transparent: true,
+              opacity,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false,
+              toneMapped: false,
+            }),
+          }) as const,
+      ),
     [],
   );
 
@@ -147,7 +170,7 @@ function Hall() {
       else if (name.startsWith("JengaPlank")) mesh.material = plank;
       else if (name.startsWith("JengaTop")) mesh.material = barWood;
       else if (name.startsWith("Jenga")) mesh.material = timber;
-      else if (name === "NeonSign") mesh.material = neon;
+      else if (name === "NeonSign" || name === "NeonFrame") mesh.material = neon;
       else if (name === "SignFrame") mesh.material = cabinet;
       else if (name.startsWith("BarPlank") || name === "BarWallPlanks") mesh.material = barWood;
       else if (name.startsWith("BarLed") || name.startsWith("BarStrip")) mesh.material = bulb;
@@ -160,37 +183,25 @@ function Hall() {
       void glyphA;
       void glyphB;
     });
-    // Neon tube glow: two additive shells around the lettering.
-    const sign = clone.getObjectByName("NeonSign") as THREE.Mesh | undefined;
-    if (sign) {
-      for (const [scale, opacity] of [
-        [1.05, 0.4],
-        [1.13, 0.16],
-      ] as const) {
-        const halo = new THREE.Mesh(
-          sign.geometry,
-          new THREE.MeshBasicMaterial({
-            color: "#ff2d55",
-            transparent: true,
-            opacity,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            toneMapped: false,
-          }),
-        );
-        halo.scale.setScalar(scale);
-        halo.raycast = () => {};
-        sign.add(halo);
+    // Neon tube glow: additive shells around the letters and the frame alike.
+    for (const partName of ["NeonSign", "NeonFrame"]) {
+      const part = clone.getObjectByName(partName) as THREE.Mesh | undefined;
+      if (!part) continue;
+      for (const halo of neonHalos) {
+        const shell = new THREE.Mesh(part.geometry, halo.material);
+        shell.scale.setScalar(halo.scale);
+        shell.raycast = () => {};
+        part.add(shell);
       }
     }
 
     return clone;
-  }, [scene, grain, boards, screens, neonMaterial]);
+  }, [scene, grain, boards, screens, neonMaterial, neonHalos]);
 
   return (
     <>
       <primitive object={model} />
-      <NeonFlicker material={neonMaterial} />
+      <NeonCycle tube={neonMaterial} halos={neonHalos} />
     </>
   );
 }
@@ -323,25 +334,37 @@ export function HallFront() {
   );
 }
 
-/** Drives the neon tube: a hard flicker once every ten seconds, then a steady hum. */
-function NeonFlicker({ material }: { material: THREE.MeshStandardMaterial }) {
+/**
+ * The neon is on for ten seconds and off for two. It does not switch cleanly: a cold
+ * tube stutters as it strikes, which is what makes it read as gas rather than a lamp.
+ */
+function NeonCycle({
+  tube,
+  halos,
+}: {
+  tube: THREE.MeshStandardMaterial;
+  halos: readonly { material: THREE.MeshBasicMaterial; base: number }[];
+}) {
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime % 10;
-
-    // A tube that is failing: two quick stutters, a short dim, then it holds.
+    const t = clock.elapsedTime % 12;
     let level: number;
-    if (t < 0.07) level = 1;
-    else if (t < 0.14) level = 0.15;
-    else if (t < 0.2) level = 1;
-    else if (t < 0.26) level = 0.35;
-    else if (t < 0.33) level = 0.9;
-    else if (t < 0.55) level = 0.45;
-    else level = 1;
 
-    // A little instability while it is lit, so it never looks like a printed sign.
-    const hum = t >= 0.55 ? 1 + Math.sin(clock.elapsedTime * 47) * 0.03 : 1;
+    if (t < 10) {
+      if (t < 0.08) level = 0.1;
+      else if (t < 0.16) level = 1;
+      else if (t < 0.22) level = 0.2;
+      else if (t < 0.3) level = 1;
+      else if (t < 0.38) level = 0.55;
+      else level = 1;
+    } else {
+      level = 0;
+    }
 
-    material.emissiveIntensity = 4 * level * hum;
+    // A lit tube is never perfectly calm.
+    const hum = level > 0 ? 1 + Math.sin(clock.elapsedTime * 43) * 0.025 : 1;
+
+    tube.emissiveIntensity = 5 * level * hum;
+    for (const halo of halos) halo.material.opacity = halo.base * level;
   });
 
   return null;

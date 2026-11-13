@@ -229,19 +229,72 @@ def build_stools(parts):
     parts.append(join(frames, "StoolFrames"))
 
 
+def _tube(obj, depth: float, name: str):
+    """Turn a curve or text into a solid round tube and return the mesh."""
+    # convert works on the selection, not just the active object.
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.convert(target="CURVE")
+    curve = bpy.context.active_object
+    # A 2D curve is filled and ignores the bevel. As a 3D curve it keeps only its
+    # outlines, and the bevel follows them, which is what a neon letter is.
+    curve.data.dimensions = "3D"
+    curve.data.bevel_depth = depth
+    curve.data.bevel_resolution = 2
+    curve.data.resolution_u = 8
+    bpy.ops.object.convert(target="MESH")
+    mesh = bpy.context.active_object
+    mesh.name = name
+    return mesh
+
+
+def _rounded_rect(width: float, height: float, radius: float, segments: int = 10):
+    """Points around a rounded rectangle, counter-clockwise."""
+    corners = [
+        (width / 2 - radius, -height / 2 + radius, -math.pi / 2),
+        (width / 2 - radius, height / 2 - radius, 0.0),
+        (-width / 2 + radius, height / 2 - radius, math.pi / 2),
+        (-width / 2 + radius, -height / 2 + radius, math.pi),
+    ]
+    points = []
+    for cx, cy, start in corners:
+        for i in range(segments + 1):
+            a = start + (math.pi / 2) * i / segments
+            points.append((cx + radius * math.cos(a), cy + radius * math.sin(a), 0.0))
+    return points
+
+
 def build_sign(parts):
-    """Neon lettering straight on the wall: no panel behind it."""
-    # Normal to +Y (facing the room), up to +Z, reading along -X for a viewer at +Y.
+    """Neon tubes in the reference's style: outlined letters inside a rounded frame."""
+    face = (-math.pi / 2, 0, math.pi)  # normal toward the room, reading for a viewer at +Y
+
+    # Lettering, as a tube following the glyph outlines.
     bpy.ops.object.text_add(location=(4.6, -ROOM_D / 2 + 0.5, 3.62), rotation=(math.pi / 2, 0, math.pi))
     text = bpy.context.active_object
-    text.name = "NeonSign"
     text.data.body = "SOLADE\nGAMES"
     text.data.align_x = "CENTER"
-    text.data.size = 0.6
-    text.data.extrude = 0.035
-    bpy.context.view_layer.objects.active = text
-    bpy.ops.object.convert(target="MESH")
-    parts.append(bpy.context.active_object)
+    text.data.size = 0.62
+    text.data.extrude = 0.0
+    text.data.offset = 0.0
+    parts.append(_tube(text, 0.018, "NeonSign"))
+
+    # The frame: a rounded rectangle of the same tube.
+    curve = bpy.data.curves.new("NeonFrameCurve", type="CURVE")
+    curve.dimensions = "3D"
+    spline = curve.splines.new("POLY")
+    pts = _rounded_rect(3.1, 2.15, 0.22)
+    spline.points.add(len(pts) - 1)
+    for i, (x, y, z) in enumerate(pts):
+        spline.points[i].co = (x, y, z, 1.0)
+    spline.use_cyclic_u = True
+    frame = bpy.data.objects.new("NeonFrameCurveObj", curve)
+    bpy.context.collection.objects.link(frame)
+    frame.location = (4.6, -ROOM_D / 2 + 0.5, 3.28)
+    frame.rotation_euler = face
+    bpy.context.view_layer.objects.active = frame
+    frame.select_set(True)
+    parts.append(_tube(frame, 0.018, "NeonFrame"))
 
 
 def build_pool_table(parts, at):
