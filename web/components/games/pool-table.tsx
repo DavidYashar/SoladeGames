@@ -228,6 +228,14 @@ function makeWall(): Brick[] {
   const random = seeded(0x5b21c);
   const out: Brick[] = [];
   for (let row = 0; row < START_ROWS; row += 1) out.push(...makeRow(row, random));
+
+  // The opening wall is generated from a fixed seed, and that seed happened to produce
+  // no glass at all. Every material should be represented, so the opening row is dealt
+  // one of each before the weighted mix fills the rest.
+  const deal: BrickKind[] = ["clay", "stone", "glass", "keg", "gold", "iron"];
+  deal.forEach((kind, i) => {
+    if (i < out.length) out[i] = { ...out[i], kind, hp: BRICK_HP[kind] };
+  });
   return out;
 }
 
@@ -914,6 +922,15 @@ type Status = "playing" | "won" | "lost";
 export function PoolTable() {
   const [bricks, setBricks] = useState<Brick[]>(() => makeWall());
   const bricksRef = useRef(bricks);
+
+  // Diagnostic: how many bricks of each material are on the table.
+  useEffect(() => {
+    (window as unknown as { __wall?: () => unknown }).__wall = () => {
+      const counts: Record<string, number> = {};
+      for (const b of bricksRef.current) counts[b.kind] = (counts[b.kind] ?? 0) + 1;
+      return counts;
+    };
+  }, []);
   const [score, setScore] = useState(0);
   const [status, setStatus] = useState<Status>("playing");
   const [booms, setBooms] = useState<Boom[]>([]);

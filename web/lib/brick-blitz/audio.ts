@@ -12,6 +12,7 @@ export class BrickAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private lastHitAt = 0;
+  private lastBrickAt = 0;
   private rollGain: GainNode | null = null;
   private rollFilter: BiquadFilterNode | null = null;
   private rollLevel = 0;
@@ -309,6 +310,7 @@ export class BrickAudio {
     const now = performance.now();
     if (now - this.lastHitAt < 22) return;
     this.lastHitAt = now;
+    this.lastBrickAt = now;
 
     const at = this.ctx.currentTime;
 
@@ -357,6 +359,8 @@ export class BrickAudio {
   /** A rail or cushion: felt-muted, low, short. */
   cushion(strength = 0.5): void {
     if (!this.ctx) return;
+    // A brick has just sounded; a rail thump on top of it only muddies the material.
+    if (performance.now() - this.lastBrickAt < 90) return;
     const at = this.ctx.currentTime;
     const s = Math.max(0.2, Math.min(1, strength));
     this.tone(at, 120, 0.09, 0.1 * s, "sine", 70);
