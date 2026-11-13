@@ -565,8 +565,9 @@ function Physics({
   const lastVelocity = useRef({ x: 0, z: 0 });
   /** Ball position last frame, for the swept brick test. */
   const lastPosition = useRef({ x: 0, z: 0 });
-  /** Brick id -> when it last took a hit, so one contact is not counted twice. */
-  const brickHitAt = useRef(new Map<number, number>());
+  /** Bricks the ball is currently touching: one contact must be one hit, however many
+   *  frames it lasts. */
+  const engaged = useRef(new Set<number>());
   const ballCollider = useRef(0);
   const byHandle = useRef(new Map<number, number>());
   const colliderForBrick = useRef(new Map<number, RAPIER.Collider>());
@@ -786,8 +787,10 @@ function Physics({
     // and at 7 m/s the ball moves ~120 mm per frame, so a single position test can step
     // straight past a brick. Walking the segment between frames fixes both: a side or
     // corner contact counts, and nothing is skipped at speed.
+    //
+    // A contact counts ONCE. The brick stays "engaged" until the ball is clear of it, so
+    // a slow roll along a face cannot chew through iron's three hit points.
     {
-      const now = performance.now();
       const pos = b.translation();
       const prev = lastPosition.current;
       const steps = Math.max(
@@ -799,22 +802,25 @@ function Physics({
       for (const brick of bricks) {
         const collider = colliderForBrick.current.get(brick.id);
         if (!collider) continue;
-        if (now - (brickHitAt.current.get(brick.id) ?? 0) < 140) continue;
 
         const at = collider.translation();
-        let contact = false;
-        for (let s = 1; s <= steps && !contact; s += 1) {
+        let closest = Infinity;
+        for (let s = 1; s <= steps; s += 1) {
           const f = s / steps;
           const px = prev.x + (pos.x - prev.x) * f;
           const pz = prev.z + (pos.z - prev.z) * f;
           const dx = Math.max(0, Math.abs(px - at.x) - BRICK.d / 2);
           const dz = Math.max(0, Math.abs(pz - at.z) - BRICK.w / 2);
-          if (Math.hypot(dx, dz) <= reach) contact = true;
+          closest = Math.min(closest, Math.hypot(dx, dz));
         }
 
-        if (contact) {
-          brickHitAt.current.set(brick.id, now);
-          hitRef.current(brick.id);
+        if (closest <= reach) {
+          if (!engaged.current.has(brick.id)) {
+            engaged.current.add(brick.id);
+            hitRef.current(brick.id);
+          }
+        } else if (closest > reach + 0.012) {
+          engaged.current.delete(brick.id);
         }
       }
 
@@ -972,8 +978,12 @@ export function PoolTable() {
   useEffect(() => {
     (window as unknown as { __wall?: () => unknown }).__wall = () => {
       const counts: Record<string, number> = {};
-      for (const b of bricksRef.current) counts[b.kind] = (counts[b.kind] ?? 0) + 1;
-      return counts;
+      let hp = 0;
+      for (const b of bricksRef.current) {
+        counts[b.kind] = (counts[b.kind] ?? 0) + 1;
+        hp += b.hp;
+      }
+      return { counts, hp };
     };
   }, []);
   const [score, setScore] = useState(0);
