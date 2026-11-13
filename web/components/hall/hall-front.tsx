@@ -273,6 +273,9 @@ function Rig({
     } else if (entered) {
       target.current.set(...INSIDE);
       targetLook.current.set(...INSIDE_LOOK);
+    } else {
+      target.current.set(...OUTSIDE);
+      targetLook.current.set(...OUTSIDE_LOOK);
     }
     const k = Math.min(1, delta * 2.4);
     pos.current.lerp(target.current, k);
