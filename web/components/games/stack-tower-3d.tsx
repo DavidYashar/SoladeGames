@@ -188,14 +188,8 @@ function TableUnderTower() {
       {/* Top slab: a box, not a rounded box, because a box maps the board across each
           face properly. Upper face flush with y = 0. */}
       <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
-        <boxGeometry args={[8.6, 1.0, 8.6]} />
+        <boxGeometry args={[8.9, 1.0, 8.9]} />
         <primitive object={top} attach="material" />
-      </mesh>
-
-      {/* Band under the top. */}
-      <mesh position={[0, -1.25, 0]} castShadow receiveShadow>
-        <boxGeometry args={[8.95, 0.55, 8.95]} />
-        <primitive object={timber} attach="material" />
       </mesh>
 
       {legs.map(([lx, lz]) => (
