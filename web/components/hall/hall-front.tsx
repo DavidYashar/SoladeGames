@@ -302,6 +302,16 @@ export function HallFront() {
     setFlying(station);
   };
 
+  const enter = () => {
+    if (flying) return;
+    setEntered(true);
+  };
+
+  const leave = () => {
+    setFlying(null);
+    setEntered(false);
+  };
+
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
       <Canvas
@@ -335,6 +345,7 @@ export function HallFront() {
         <pointLight position={[4.9, 2.6, 7.6]} intensity={6} color="#ff2d55" distance={7} decay={2} />
 
         <Hall />
+        {!entered && <Doorway onEnter={enter} />}
 
         {STATIONS.map((station) => (
           <Hotspot key={station.route} station={station} onPick={() => pick(station)} />
@@ -350,9 +361,20 @@ export function HallFront() {
       </Canvas>
 
       {/* Entrance */}
+      {/* Out again: the same door, from the other side. */}
+      {entered && (
+        <button
+          type="button"
+          onClick={leave}
+          className="font-display absolute left-6 top-6 z-10 inline-flex items-center gap-2 border border-zinc-700/60 bg-black/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-zinc-400 transition-colors hover:border-[#ff4d3a]/60 hover:text-white"
+        >
+          <span aria-hidden="true">&larr;</span> Leave
+        </button>
+      )}
+
       {/* The entrance: the doorway stays visible, the words sit at the foot of the frame. */}
       <div
-        className={`absolute inset-x-0 bottom-0 z-10 flex flex-col items-center bg-gradient-to-t from-black via-black/75 to-transparent pb-14 pt-32 transition-opacity duration-700 ${
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center bg-gradient-to-t from-black via-black/75 to-transparent pb-14 pt-32 transition-opacity duration-700 ${
           entered ? "pointer-events-none opacity-0" : "opacity-100"
         }`}
       >
@@ -367,8 +389,8 @@ export function HallFront() {
         </p>
         <button
           type="button"
-          onClick={() => setEntered(true)}
-          className="font-display mt-8 border border-[#ff4d3a]/60 px-8 py-3 text-[11px] uppercase tracking-[0.35em] text-[#ff9d8a] transition-colors hover:border-[#ff4d3a] hover:bg-[#ff4d3a]/10 hover:text-white"
+          onClick={enter}
+          className="font-display pointer-events-auto mt-8 border border-[#ff4d3a]/60 px-8 py-3 text-[11px] uppercase tracking-[0.35em] text-[#ff9d8a] transition-colors hover:border-[#ff4d3a] hover:bg-[#ff4d3a]/10 hover:text-white"
         >
           Walk in
         </button>
@@ -464,6 +486,33 @@ function Lamp({
       <primitive object={target} />
       <pointLight position={at} intensity={7} color="#ffd9a6" distance={4.5} decay={2} />
     </>
+  );
+}
+
+/** The open doorway: click it to walk in. */
+function Doorway({ onEnter }: { onEnter: () => void }) {
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    document.body.style.cursor = hovered ? "pointer" : "auto";
+  }, [hovered]);
+
+  return (
+    <mesh
+      position={[0, 1.7, -8.32]}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={() => setHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEnter();
+      }}
+    >
+      <boxGeometry args={[4.3, 3.3, 0.3]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
   );
 }
 
