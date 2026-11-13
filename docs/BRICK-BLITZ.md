@@ -1,6 +1,6 @@
 # Brick Blitz: current state
 
-Last updated 2026-11-12. This describes the game **as it exists in code today**: a
+Last updated 2026-11-13. This describes the game **as it exists in code today**: a
 brick-breaker played on a billiard table.
 
 `docs/GAME-RULES.md` describes the earlier canvas version and is superseded.
@@ -104,6 +104,49 @@ created for new bricks, removed for destroyed ones, and rebuilt when a row shift
 Hits are reported upward with a callback, so game state lives in one place.
 
 ---
+
+## 5b. How a brick hit is detected
+
+Not by Rapier's contact events. Those are reliable for a square hit and unreliable for a
+graze: a ball clipping a side or corner often separates before the event is delivered, so
+the ball bounced, nothing scored and no sound played.
+
+Instead the ball's path between frames is **swept** against each brick's footprint:
+
+- the segment from last frame's position to this one is sampled every 15 mm, so nothing
+  is skipped at 7 m/s (~120 mm per frame)
+- distance is measured to the brick's rectangle, not its centre, so **side and corner
+  contacts count**
+- a contact is **latched**: one touch is one hit point, and the brick cannot be hit again
+  until the ball is 19 mm clear of it
+
+That last rule matters. An earlier version used a 140 ms cooldown, which let a ball that
+lingered against iron drain all three of its hit points from a single contact — accurate
+but far too easy.
+
+Verified serve by serve: hit points consumed always equal hits registered.
+
+## 5c. Sound
+
+Six recorded material hits in `web/public/audio/bricks/` — clay, stone, glass, keg, gold,
+iron — plus a cue strike, rail thumps, a row warning and end-of-round cues.
+
+Three things make it work:
+
+1. **Play from the transient, not the file start.** The recordings do not begin with the
+   hit: iron's lands 0.9 s into a 15 s file. Each sample is measured on load, the rise out
+   of the noise floor found, and playback starts there for a 0.5 s window.
+2. **Level each recording.** RMS is measured over the first 0.3 s from that onset and a
+   per-sample gain (0.7–2.6x) evens out a 5:1 spread between recordings.
+3. **No blanket rate limit.** Throttling all bricks to one sound per 22 ms dropped real
+   hits when the ball crossed several bricks in a frame. Only a ceiling of 6 starts per
+   30 ms remains, to stop a burst swamping the mix.
+
+A rail thump is suppressed for 90 ms after a brick hit, or the generic thud buried the
+material character.
+
+There is **no continuous ambience or rolling bed** in this game — the earlier noise-based
+roll read as wind and was removed.
 
 ## 6. Measured behaviour
 
