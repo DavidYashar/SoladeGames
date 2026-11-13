@@ -15,6 +15,10 @@ export class BrickAudio {
   private rollFilter: BiquadFilterNode | null = null;
   private rollLevel = 0;
   private lastHitAt = 0;
+  private samples = new Map<BrickKind, AudioBuffer>();
+  private loading = false;
+  /** How much of each hit sample is used. A brick hit wants a snap, not a tail. */
+  private sampleSeconds = 0.5;
 
   get state(): string {
     return this.ctx ? this.ctx.state : "none";
@@ -47,6 +51,62 @@ export class BrickAudio {
     }
 
     if (this.ctx.state === "suspended") await this.ctx.resume();
+    void this.loadSamples();
+  }
+
+  /** Fetch and decode the recorded hits once. Missing files fall back to synthesis. */
+  private async loadSamples(): Promise<void> {
+    if (this.loading || !this.ctx) return;
+    this.loading = true;
+
+    const files: [BrickKind, string][] = [
+      ["clay", "clay"],
+      ["stone", "clay"], // no stone recording; the clay hit reads closest
+      ["glass", "glass"],
+      ["keg", "keg"],
+      ["gold", "gold"],
+      ["iron", "iron"],
+    ];
+
+    await Promise.all(
+      files.map(async ([kind, file]) => {
+        if (this.samples.has(kind)) return;
+        try {
+          const response = await fetch(`/audio/bricks/${file}.mp3`);
+          if (!response.ok) return;
+          const data = await response.arrayBuffer();
+          const buffer = await this.ctx!.decodeAudioData(data);
+          this.samples.set(kind, buffer);
+        } catch {
+          // Keep the synthesised version for this material.
+        }
+      }),
+    );
+  }
+
+  /** Play a recorded hit, clipped to sampleSeconds so it stays percussive. */
+  private playSample(kind: BrickKind, gain: number): boolean {
+    const ctx = this.ctx;
+    const buffer = this.samples.get(kind);
+    if (!ctx || !buffer) return false;
+
+    const at = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    // Slight pitch variation so repeats do not sound like a loop.
+    source.playbackRate.value = 0.96 + Math.random() * 0.08;
+
+    const envelope = ctx.createGain();
+    const length = this.sampleSeconds;
+    envelope.gain.setValueAtTime(0, at);
+    envelope.gain.linearRampToValueAtTime(gain, at + 0.004);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, at + length);
+
+    source.connect(envelope);
+    envelope.connect(this.master!);
+    source.start(at);
+    source.stop(at + length + 0.02);
+    return true;
   }
 
   private noise(seconds = 1): AudioBuffer {
@@ -162,6 +222,12 @@ export class BrickAudio {
     this.lastHitAt = now;
 
     const at = this.ctx.currentTime;
+
+    if (this.playSample(kind, breaking ? 0.62 : 0.5)) {
+      if (breaking) this.tone(at + 0.01, 110, 0.16, 0.14, "sine", 55);
+      return;
+    }
+
     switch (kind) {
       case "clay":
         this.burst(at, 0.04, 900, 0.16, 1.6);
