@@ -230,19 +230,15 @@ def build_stools(parts):
 
 
 def build_sign(parts):
-    """Framed neon beside the back bar, facing the room."""
-    frame = box("SignFrame", (2.9, 0.12, 2.6), (4.9, -ROOM_D / 2 + 0.5, 2.45))
-    parts.append(frame)
-
-    # Text lies in the XZ plane facing -Y, which is the way the room looks at it.
+    """Neon lettering straight on the wall: no panel behind it."""
     # Normal to +Y (facing the room), up to +Z, reading along -X for a viewer at +Y.
-    bpy.ops.object.text_add(location=(4.9, -ROOM_D / 2 + 0.62, 2.75), rotation=(math.pi / 2, 0, math.pi))
+    bpy.ops.object.text_add(location=(4.6, -ROOM_D / 2 + 0.5, 3.62), rotation=(math.pi / 2, 0, math.pi))
     text = bpy.context.active_object
     text.name = "NeonSign"
-    text.data.body = "GAME\nBAR"
+    text.data.body = "SOLADE\nGAMES"
     text.data.align_x = "CENTER"
-    text.data.size = 0.52
-    text.data.extrude = 0.03
+    text.data.size = 0.6
+    text.data.extrude = 0.035
     bpy.context.view_layer.objects.active = text
     bpy.ops.object.convert(target="MESH")
     parts.append(bpy.context.active_object)

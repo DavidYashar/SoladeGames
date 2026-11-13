@@ -57,6 +57,17 @@ function Hall() {
     "/billboards/pinball.png",
   ]);
 
+  const neonMaterial = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: "#ff2d55",
+        emissive: new THREE.Color("#ff2d55"),
+        emissiveIntensity: 4,
+        toneMapped: false,
+      }),
+    [],
+  );
+
   const model = useMemo(() => {
     grain.colorSpace = THREE.SRGBColorSpace;
     grain.anisotropy = 8;
@@ -90,7 +101,7 @@ function Hall() {
     });
     const felt = new THREE.MeshStandardMaterial({ color: "#1e7a52", roughness: 0.92, metalness: 0.02 });
     const cabinet = new THREE.MeshStandardMaterial({ color: "#241a2c", roughness: 0.42, metalness: 0.35 });
-    const neon = new THREE.MeshStandardMaterial({ color: "#ff2d55", emissive: new THREE.Color("#ff2d55"), emissiveIntensity: 4, toneMapped: false });
+    const neon = neonMaterial;
     const plank = new THREE.MeshStandardMaterial({ map: grain, color: "#c79a63", roughness: 0.6, metalness: 0.03 });
     const glyphA = new THREE.MeshBasicMaterial({ map: screens[0], toneMapped: false });
     const glyphB = new THREE.MeshBasicMaterial({ map: screens[1], toneMapped: false });
@@ -150,9 +161,14 @@ function Hall() {
       void glyphB;
     });
     return clone;
-  }, [scene, grain, boards, screens]);
+  }, [scene, grain, boards, screens, neonMaterial]);
 
-  return <primitive object={model} />;
+  return (
+    <>
+      <primitive object={model} />
+      <NeonFlicker material={neonMaterial} />
+    </>
+  );
 }
 
 /** Camera that starts at the door and flies into a chosen station. */
@@ -281,6 +297,30 @@ export function HallFront() {
       </div>
     </div>
   );
+}
+
+/** Drives the neon tube: a hard flicker once every ten seconds, then a steady hum. */
+function NeonFlicker({ material }: { material: THREE.MeshStandardMaterial }) {
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime % 10;
+
+    // A tube that is failing: two quick stutters, a short dim, then it holds.
+    let level: number;
+    if (t < 0.07) level = 1;
+    else if (t < 0.14) level = 0.15;
+    else if (t < 0.2) level = 1;
+    else if (t < 0.26) level = 0.35;
+    else if (t < 0.33) level = 0.9;
+    else if (t < 0.55) level = 0.45;
+    else level = 1;
+
+    // A little instability while it is lit, so it never looks like a printed sign.
+    const hum = t >= 0.55 ? 1 + Math.sin(clock.elapsedTime * 47) * 0.03 : 1;
+
+    material.emissiveIntensity = 4 * level * hum;
+  });
+
+  return null;
 }
 
 /** One pendant bulb: a spot that actually aims at its own table. */
