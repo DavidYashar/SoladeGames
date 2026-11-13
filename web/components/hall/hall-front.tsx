@@ -59,10 +59,14 @@ function Hall() {
 
   const neonMaterial = useMemo(
     () =>
-      new THREE.MeshStandardMaterial({
-        color: "#ff4d8d",
+      new THREE.MeshPhysicalMaterial({
+        color: "#ff6ba3",
         emissive: new THREE.Color("#ff2d7a"),
-        emissiveIntensity: 5,
+        emissiveIntensity: 8,
+        roughness: 0.16,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.08,
         toneMapped: false,
       }),
     [],
@@ -71,15 +75,16 @@ function Hall() {
   const neonHalos = useMemo(
     () =>
       [
-        [1.06, 0.45],
-        [1.16, 0.17],
+        [0.999, 0.55, "#ffe8f1"],
+        [1.05, 0.55, "#ff4d94"],
+        [1.16, 0.24, "#ff2d7a"],
       ].map(
-        ([scale, opacity]) =>
+        ([scale, opacity, color]) =>
           ({
             scale,
             base: opacity,
             material: new THREE.MeshBasicMaterial({
-              color: "#ff2d7a",
+              color,
               transparent: true,
               opacity,
               blending: THREE.AdditiveBlending,
@@ -342,7 +347,7 @@ function NeonCycle({
   tube,
   halos,
 }: {
-  tube: THREE.MeshStandardMaterial;
+  tube: THREE.MeshPhysicalMaterial;
   halos: readonly { material: THREE.MeshBasicMaterial; base: number }[];
 }) {
   useFrame(({ clock }) => {
@@ -363,7 +368,7 @@ function NeonCycle({
     // A lit tube is never perfectly calm.
     const hum = level > 0 ? 1 + Math.sin(clock.elapsedTime * 43) * 0.025 : 1;
 
-    tube.emissiveIntensity = 5 * level * hum;
+    tube.emissiveIntensity = 8 * level * hum;
     for (const halo of halos) halo.material.opacity = halo.base * level;
   });
 

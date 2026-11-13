@@ -266,35 +266,14 @@ def _rounded_rect(width: float, height: float, radius: float, segments: int = 10
 
 
 def build_sign(parts):
-    """Neon tubes in the reference's style: outlined letters inside a rounded frame."""
-    face = (-math.pi / 2, 0, math.pi)  # normal toward the room, reading for a viewer at +Y
-
-    # Lettering, as a tube following the glyph outlines.
-    bpy.ops.object.text_add(location=(4.6, -ROOM_D / 2 + 0.5, 3.62), rotation=(math.pi / 2, 0, math.pi))
+    """Neon lettering on its own, no frame: outlined tube letters, as in the reference."""
+    bpy.ops.object.text_add(location=(6.5, -ROOM_D / 2 + 0.5, 3.98), rotation=(math.pi / 2, 0, math.pi))
     text = bpy.context.active_object
     text.data.body = "SOLADE\nGAMES"
     text.data.align_x = "CENTER"
-    text.data.size = 0.62
+    text.data.size = 0.68
     text.data.extrude = 0.0
-    text.data.offset = 0.0
-    parts.append(_tube(text, 0.018, "NeonSign"))
-
-    # The frame: a rounded rectangle of the same tube.
-    curve = bpy.data.curves.new("NeonFrameCurve", type="CURVE")
-    curve.dimensions = "3D"
-    spline = curve.splines.new("POLY")
-    pts = _rounded_rect(3.1, 2.15, 0.22)
-    spline.points.add(len(pts) - 1)
-    for i, (x, y, z) in enumerate(pts):
-        spline.points[i].co = (x, y, z, 1.0)
-    spline.use_cyclic_u = True
-    frame = bpy.data.objects.new("NeonFrameCurveObj", curve)
-    bpy.context.collection.objects.link(frame)
-    frame.location = (4.6, -ROOM_D / 2 + 0.5, 3.28)
-    frame.rotation_euler = face
-    bpy.context.view_layer.objects.active = frame
-    frame.select_set(True)
-    parts.append(_tube(frame, 0.018, "NeonFrame"))
+    parts.append(_tube(text, 0.02, "NeonSign"))
 
 
 def build_pool_table(parts, at):
