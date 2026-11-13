@@ -763,11 +763,9 @@ function Physics({
       }
     }
 
-    // Rolling bed, and a thump whenever the ball is knocked off course — that covers
-    // the cushions, the brick faces and the handler without tracking collider handles.
+    // A thump whenever the ball is knocked off course: that covers the cushions, the
+    // brick faces and the handler without tracking collider handles.
     const vel = b.linvel();
-    const speedNow = Math.hypot(vel.x, vel.z);
-    brickAudio.roll(speedNow);
     {
       const prev = lastVelocity.current;
       const dv = Math.hypot(vel.x - prev.x, vel.z - prev.z);

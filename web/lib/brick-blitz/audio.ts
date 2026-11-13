@@ -11,9 +11,6 @@ export type BrickKind = "clay" | "stone" | "glass" | "keg" | "gold" | "iron";
 export class BrickAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
-  private rollGain: GainNode | null = null;
-  private rollFilter: BiquadFilterNode | null = null;
-  private rollLevel = 0;
   private lastHitAt = 0;
   private samples = new Map<BrickKind, AudioBuffer>();
   private loading = false;
@@ -47,7 +44,6 @@ export class BrickAudio {
 
       this.ctx = ctx;
       this.master = master;
-      this.startRoll();
     }
 
     if (this.ctx.state === "suspended") await this.ctx.resume();
@@ -121,38 +117,6 @@ export class BrickAudio {
       data[i] = last * 3.5;
     }
     return buffer;
-  }
-
-  private startRoll(): void {
-    const ctx = this.ctx!;
-    const source = ctx.createBufferSource();
-    source.buffer = this.noise(2);
-    source.loop = true;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 500;
-    filter.Q.value = 1.2;
-
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.master!);
-    source.start();
-
-    this.rollFilter = filter;
-    this.rollGain = gain;
-  }
-
-  /** Continuous roll, driven by the ball's speed. */
-  roll(speed: number): void {
-    if (!this.rollGain || !this.rollFilter) return;
-    const target = Math.min(1, speed / 7) * 0.11;
-    this.rollLevel += (target - this.rollLevel) * 0.2;
-    this.rollGain.gain.value = this.rollLevel;
-    this.rollFilter.frequency.value = 300 + Math.min(1, speed / 7) * 700;
   }
 
   private burst(at: number, duration: number, frequency: number, gain: number, q = 1.2): void {
