@@ -160,6 +160,30 @@ function Hall() {
       void glyphA;
       void glyphB;
     });
+    // Neon tube glow: two additive shells around the lettering.
+    const sign = clone.getObjectByName("NeonSign") as THREE.Mesh | undefined;
+    if (sign) {
+      for (const [scale, opacity] of [
+        [1.05, 0.4],
+        [1.13, 0.16],
+      ] as const) {
+        const halo = new THREE.Mesh(
+          sign.geometry,
+          new THREE.MeshBasicMaterial({
+            color: "#ff2d55",
+            transparent: true,
+            opacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            toneMapped: false,
+          }),
+        );
+        halo.scale.setScalar(scale);
+        halo.raycast = () => {};
+        sign.add(halo);
+      }
+    }
+
     return clone;
   }, [scene, grain, boards, screens, neonMaterial]);
 
