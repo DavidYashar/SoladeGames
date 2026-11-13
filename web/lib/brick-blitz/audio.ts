@@ -12,6 +12,9 @@ export class BrickAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private lastHitAt = 0;
+  private rollGain: GainNode | null = null;
+  private rollFilter: BiquadFilterNode | null = null;
+  private rollLevel = 0;
   private samples = new Map<BrickKind, AudioBuffer>();
   private loading = false;
   /** How much of each hit sample is used. A brick hit wants a snap, not a tail. */
@@ -44,6 +47,7 @@ export class BrickAudio {
 
       this.ctx = ctx;
       this.master = master;
+      this.startRoll();
     }
 
     if (this.ctx.state === "suspended") await this.ctx.resume();
@@ -57,7 +61,7 @@ export class BrickAudio {
 
     const files: [BrickKind, string][] = [
       ["clay", "clay"],
-      ["stone", "clay"], // no stone recording; the clay hit reads closest
+      ["stone", "stone"],
       ["glass", "glass"],
       ["keg", "keg"],
       ["gold", "gold"],
@@ -117,6 +121,48 @@ export class BrickAudio {
       data[i] = last * 3.5;
     }
     return buffer;
+  }
+
+  /**
+   * The ball rolling on the felt. Deliberately a low rumble, not a wash of noise: a
+   * wide band centred high is what made the earlier version sound like wind.
+   */
+  private startRoll(): void {
+    const ctx = this.ctx!;
+    const source = ctx.createBufferSource();
+    source.buffer = this.noise(2);
+    source.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 210;
+    filter.Q.value = 0.7;
+
+    const shelf = ctx.createBiquadFilter();
+    shelf.type = "lowpass";
+    shelf.frequency.value = 380;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+
+    source.connect(filter);
+    filter.connect(shelf);
+    shelf.connect(gain);
+    gain.connect(this.master!);
+    source.start();
+
+    this.rollFilter = filter;
+    this.rollGain = gain;
+  }
+
+  /** Continuous roll, driven by the ball's speed. Quiet, and silent when stopped. */
+  roll(speed: number): void {
+    if (!this.rollGain || !this.rollFilter) return;
+    const moving = Math.max(0, Math.min(1, (speed - 0.25) / 6));
+    const target = moving * 0.085;
+    this.rollLevel += (target - this.rollLevel) * 0.18;
+    this.rollGain.gain.value = this.rollLevel;
+    this.rollFilter.frequency.value = 170 + moving * 190;
   }
 
   private burst(at: number, duration: number, frequency: number, gain: number, q = 1.2): void {
@@ -187,7 +233,7 @@ export class BrickAudio {
 
     const at = this.ctx.currentTime;
 
-    if (this.playSample(kind, breaking ? 0.62 : 0.5)) {
+    if (this.playSample(kind, breaking ? 1.0 : 0.85)) {
       if (breaking) this.tone(at + 0.01, 110, 0.16, 0.14, "sine", 55);
       return;
     }
