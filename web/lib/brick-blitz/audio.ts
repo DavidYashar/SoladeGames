@@ -16,12 +16,48 @@ export class BrickAudio {
   private rollFilter: BiquadFilterNode | null = null;
   private rollLevel = 0;
   private samples = new Map<BrickKind, AudioBuffer>();
+  /** Where each recording's hit actually starts, and how loud it is. */
+  private meta = new Map<BrickKind, { onset: number; gain: number }>();
   private loading = false;
   /** How much of each hit sample is used. A brick hit wants a snap, not a tail. */
   private sampleSeconds = 0.5;
 
   get state(): string {
     return this.ctx ? this.ctx.state : "none";
+  }
+
+  /** Diagnostic: level of each recording, and where its energy actually starts. */
+  analyse(): Record<string, { seconds: number; headLevel: number; peakAt: number }> {
+    const out: Record<string, { seconds: number; headLevel: number; peakAt: number }> = {};
+    for (const [kind, buffer] of this.samples) {
+      const data = buffer.getChannelData(0);
+      const rate = buffer.sampleRate;
+      let peak = 0;
+      let peakAt = 0;
+      for (let i = 0; i < data.length; i += 1) {
+        const v = Math.abs(data[i]);
+        if (v > peak) {
+          peak = v;
+          peakAt = i / rate;
+        }
+      }
+      // Energy inside the 0.5 s window we actually play.
+      const window = Math.min(data.length, Math.floor(rate * 0.5));
+      let sum = 0;
+      for (let i = 0; i < window; i += 1) sum += data[i] * data[i];
+      out[kind] = {
+        seconds: Number(buffer.duration.toFixed(2)),
+        headLevel: Number(Math.sqrt(sum / window).toFixed(3)),
+        peakAt: Number(peakAt.toFixed(2)),
+      };
+    }
+    return out;
+  }
+
+  /** Diagnostic: which recordings decoded, and how often each material has played. */
+  private plays: Record<string, number> = {};
+  get report(): { loaded: string[]; plays: Record<string, number> } {
+    return { loaded: [...this.samples.keys()], plays: { ...this.plays } };
   }
 
   async unlock(): Promise<void> {
@@ -77,11 +113,49 @@ export class BrickAudio {
           const data = await response.arrayBuffer();
           const buffer = await this.ctx!.decodeAudioData(data);
           this.samples.set(kind, buffer);
+          this.meta.set(kind, this.measure(buffer));
         } catch {
           // Keep the synthesised version for this material.
         }
       }),
     );
+  }
+
+  /**
+   * Find where the hit is in a recording. Several of these files do not begin with the
+   * transient — iron's lands 0.9 s in — so playing from zero and cutting at 0.5 s
+   * produced near silence.
+   */
+  private measure(buffer: AudioBuffer): { onset: number; gain: number } {
+    const data = buffer.getChannelData(0);
+    const rate = buffer.sampleRate;
+    let peak = 0;
+    let peakIndex = 0;
+    for (let i = 0; i < data.length; i += 1) {
+      const v = Math.abs(data[i]);
+      if (v > peak) {
+        peak = v;
+        peakIndex = i;
+      }
+    }
+
+    // Walk back to where the sound rises out of the noise floor.
+    const threshold = peak * 0.25;
+    let onsetIndex = peakIndex;
+    while (onsetIndex > 0 && Math.abs(data[onsetIndex]) > threshold) onsetIndex -= 1;
+
+    const peakAt = peakIndex / rate;
+    const onset = Math.max(0, onsetIndex / rate - 0.01);
+
+    // Even out the loudness differences between recordings.
+    let sum = 0;
+    const window = Math.min(data.length - onsetIndex, Math.floor(rate * 0.3));
+    for (let i = onsetIndex; i < onsetIndex + window; i += 1) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / Math.max(1, window));
+    const gain = Math.max(0.7, Math.min(2.6, 0.22 / Math.max(0.02, rms)));
+
+    void peakAt;
+    return { onset, gain };
   }
 
   /** Play a recorded hit, clipped to sampleSeconds so it stays percussive. */
@@ -91,6 +165,9 @@ export class BrickAudio {
     if (!ctx || !buffer) return false;
 
     const at = ctx.currentTime;
+    this.plays[kind] = (this.plays[kind] ?? 0) + 1;
+
+    const meta = this.meta.get(kind) ?? { onset: 0, gain: 1 };
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     // Slight pitch variation so repeats do not sound like a loop.
@@ -98,13 +175,15 @@ export class BrickAudio {
 
     const envelope = ctx.createGain();
     const length = this.sampleSeconds;
+    const level = gain * meta.gain;
     envelope.gain.setValueAtTime(0, at);
-    envelope.gain.linearRampToValueAtTime(gain, at + 0.004);
+    envelope.gain.linearRampToValueAtTime(level, at + 0.004);
     envelope.gain.exponentialRampToValueAtTime(0.0001, at + length);
 
     source.connect(envelope);
     envelope.connect(this.master!);
-    source.start(at);
+    // Start at the hit, not at the start of the file.
+    source.start(at, meta.onset);
     source.stop(at + length + 0.02);
     return true;
   }

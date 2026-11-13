@@ -472,6 +472,11 @@ function Handler() {
 
     const onDown = (event: PointerEvent) => {
       void brickAudio.unlock();
+      (window as unknown as { __brick?: () => unknown }).__brick = () => brickAudio.report;
+      (window as unknown as { __brickAnalyser?: () => unknown }).__brickAnalyser = () =>
+        brickAudio.analyse();
+      (window as unknown as { __brickPlay?: (k: string) => void }).__brickPlay = (k) =>
+        brickAudio.brick(k as never, false);
       if (!aim(event)) return;
       const ball = shared.ballBody;
       if (!ball) return;
