@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { brickAudio } from "@/lib/brick-blitz/audio";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
@@ -470,6 +471,7 @@ function Handler() {
     };
 
     const onDown = (event: PointerEvent) => {
+      void brickAudio.unlock();
       if (!aim(event)) return;
       const ball = shared.ballBody;
       if (!ball) return;
@@ -481,6 +483,7 @@ function Handler() {
 
       const lean = THREE.MathUtils.clamp((hit.z / (BED.d / 2)) * 1.05, -0.92, 0.92);
       const scale = 1 / Math.hypot(1, lean);
+      brickAudio.serve();
       ball.setLinvel(
         { x: -scale * BALL_SPEED, y: 0, z: lean * scale * BALL_SPEED },
         true,
@@ -546,6 +549,7 @@ function Physics({
   const shadow = useRef<Mesh>(null);
   const world = useRef<RAPIER.World | null>(null);
   const body = useRef<RAPIER.RigidBody | null>(null);
+  const lastVelocity = useRef({ x: 0, z: 0 });
   const ballCollider = useRef(0);
   const byHandle = useRef(new Map<number, number>());
   const colliderForBrick = useRef(new Map<number, RAPIER.Collider>());
@@ -759,6 +763,18 @@ function Physics({
       }
     }
 
+    // Rolling bed, and a thump whenever the ball is knocked off course — that covers
+    // the cushions, the brick faces and the handler without tracking collider handles.
+    const vel = b.linvel();
+    const speedNow = Math.hypot(vel.x, vel.z);
+    brickAudio.roll(speedNow);
+    {
+      const prev = lastVelocity.current;
+      const dv = Math.hypot(vel.x - prev.x, vel.z - prev.z);
+      lastVelocity.current = { x: vel.x, z: vel.z };
+      if (dv > 1.1) brickAudio.cushion(Math.min(1, dv / 6));
+    }
+
     const t = b.translation();
     const r = b.rotation();
     if (mesh.current) {
@@ -916,9 +932,12 @@ export function PoolTable() {
       if (!brick) return;
 
       if (brick.hp > 1) {
+        brickAudio.brick(brick.kind, false);
         commit(current.map((b) => (b.id === id ? { ...b, hp: b.hp - 1 } : b)));
         return;
       }
+
+      brickAudio.brick(brick.kind, true);
 
       const now = Date.now();
       setBooms((list) => [
@@ -929,7 +948,10 @@ export function PoolTable() {
 
       const left = current.filter((b) => b.id !== id);
       commit(left);
-      if (left.length === 0) setStatus("won");
+      if (left.length === 0) {
+        brickAudio.win();
+        setStatus("won");
+      }
     },
     [commit],
   );
@@ -940,8 +962,12 @@ export function PoolTable() {
     const shifted = bricksRef.current.map((b) => ({ ...b, row: b.row + 1 }));
     const fresh = makeRow(0, Math.random);
     const next = [...shifted, ...fresh];
+    brickAudio.rowAdvance();
     commit(next);
-    if (next.some((b) => rowX(b.row) >= MIDLINE_X)) setStatus("lost");
+    if (next.some((b) => rowX(b.row) >= MIDLINE_X)) {
+      brickAudio.lose();
+      setStatus("lost");
+    }
   }, [commit]);
 
   useEffect(() => {
@@ -1056,7 +1082,14 @@ export function PoolTable() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Score</p>
+            <a
+            href="/"
+            aria-label="Back to the hall"
+            className="pointer-events-auto mb-3 inline-flex items-center gap-1.5 font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none"
+          >
+            <span aria-hidden="true">&larr;</span> Hall
+          </a>
+          <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Score</p>
             <p className="font-display text-2xl tabular-nums text-zinc-100">{score}</p>
           </div>
           <div className="text-right">
