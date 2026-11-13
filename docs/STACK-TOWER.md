@@ -9,7 +9,7 @@ was deleted.
 ## Sound
 
 Three events, all real recordings in `web/public/audio/stack/`, played through a small
-synthesiser wrapper ([web/lib/stack-tower/audio.ts](</C:/Users/yasha/Deepseek harness Projects/arkade/web/lib/stack-tower/audio.ts>)):
+synthesiser wrapper ([web/lib/stack-tower/audio.ts](../../web/lib/stack-tower/audio.ts)):
 
 | Event | File | Notes |
 |---|---|---|
