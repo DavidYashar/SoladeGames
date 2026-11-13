@@ -7,11 +7,20 @@ import { SoladeWordmark, RobotMark } from "@/components/brand/arcade-logo";
 import { ConnectWallet } from "@/components/connect-wallet";
 
 /** Sticky top bar: brand, nav, live chain badge, wallet — with a mobile hamburger menu. */
-const NAV = [
-  { href: "/games/stack-tower", label: "Machines" },
-  { href: "/play", label: "Puzzle" },
-  { href: "/docs", label: "Docs" },
-] as const;
+const DEMO = process.env.NEXT_PUBLIC_DEMO === "1";
+
+// The demo build has no account routes, so the puzzle link is left out: it leads to a
+// gate that cannot be satisfied without a server.
+const NAV: ReadonlyArray<{ href: string; label: string }> = DEMO
+  ? [
+      { href: "/games/stack-tower", label: "Machines" },
+      { href: "/docs", label: "Docs" },
+    ]
+  : [
+      { href: "/games/stack-tower", label: "Machines" },
+      { href: "/play", label: "Puzzle" },
+      { href: "/docs", label: "Docs" },
+    ];
 
 export function ArcHeader() {
   const [open, setOpen] = useState(false);
@@ -36,16 +45,18 @@ export function ArcHeader() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <span className="hidden items-center gap-2 whitespace-nowrap rounded-sm border border-white/10 bg-white/[0.04] px-3 py-1.5 font-display text-[10px] uppercase tracking-wider text-zinc-300 lg:flex">
+          <span className={DEMO ? "hidden" : "hidden items-center gap-2 whitespace-nowrap rounded-sm border border-white/10 bg-white/[0.04] px-3 py-1.5 font-display text-[10px] uppercase tracking-wider text-zinc-300 lg:flex"}>
             <span className="arcade-eyes flex items-center gap-1" aria-hidden>
               <span className="block h-2 w-2 bg-[#22e0ff]" />
               <span className="block h-2 w-2 bg-[#22e0ff]" />
             </span>
             Solana Devnet
           </span>
-          <div className="hidden md:block">
-            <ConnectWallet />
-          </div>
+          {DEMO ? null : (
+            <div className="hidden md:block">
+              <ConnectWallet />
+            </div>
+          )}
           <button
             aria-label="Toggle menu"
             aria-expanded={open}
@@ -100,10 +111,12 @@ export function ArcHeader() {
               {n.label}
             </Link>
           ))}
-          <span className="mt-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-            <RobotMark className="h-4 w-auto text-white" />
-            Solana Devnet · cluster devnet
-          </span>
+          {DEMO ? null : (
+            <span className="mt-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <RobotMark className="h-4 w-auto text-white" />
+              Solana Devnet · cluster devnet
+            </span>
+          )}
           <div className="mt-3 flex w-full max-w-xs justify-center">
             <ConnectWallet side="top" />
           </div>

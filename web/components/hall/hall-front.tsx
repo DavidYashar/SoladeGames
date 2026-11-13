@@ -471,7 +471,7 @@ export function HallFront() {
           The Hall
         </h1>
         <p className="mt-3 max-w-sm text-center text-sm text-zinc-400">
-          Three machines. Free to play. Solana settlement.
+          Three machines. Free to play.
         </p>
         <button
           type="button"

@@ -57,6 +57,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Dev stand-in: `/api/dev/player` only answers under `next dev`, so this effect is
   // inert in a production build and the gate behaves exactly as it always did.
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEMO === "1") return;
     if (connected) {
       setDevPlayer(null);
       return;
