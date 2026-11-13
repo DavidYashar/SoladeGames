@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { ContactShadows, OrbitControls, RoundedBox } from "@react-three/drei";
+import { ContactShadows, OrbitControls, RoundedBox, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { Mesh } from "three";
 
@@ -141,26 +141,34 @@ function Plank({
   );
 }
 
-/** The table, built once: shared wood material, four legs, a banded top. */
+/** The table: the photographed surface on a thick slab, four legs under it. */
 function TableUnderTower() {
   const grain = useMemo(() => makeWoodTextures(), []);
+
+  // The photographed top. Repeat is left at 1:1 so the grain runs across the whole
+  // surface rather than tiling visibly.
+  const surface = useTexture("/textures/table-wood.png");
+  surface.colorSpace = THREE.SRGBColorSpace;
+  surface.anisotropy = 8;
+
   const top = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        map: grain.map,
-        roughnessMap: grain.roughnessMap,
-        color: "#d3a469",
-        roughness: 0.58,
+        map: surface,
+        color: "#ffffff",
+        roughness: 0.46,
         metalness: 0.02,
+        emissive: new THREE.Color("#2a1a10"),
+        emissiveIntensity: 0.25,
       }),
-    [grain],
+    [surface],
   );
   const edge = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
         map: grain.map,
-        color: "#8a6039",
-        roughness: 0.7,
+        color: "#7a5230",
+        roughness: 0.68,
         metalness: 0.02,
       }),
     [grain],
@@ -175,37 +183,50 @@ function TableUnderTower() {
 
   return (
     <group>
-      {/* Top slab, its upper face flush with y = 0. */}
+      {/* Top slab: twice the depth it had, upper face still flush with y = 0. */}
       <RoundedBox
-        args={[8.6, 0.5, 8.6]}
-        radius={0.07}
+        args={[8.6, 1.0, 8.6]}
+        radius={0.06}
         smoothness={3}
-        position={[0, -0.25, 0]}
+        position={[0, -0.5, 0]}
         castShadow
         receiveShadow
       >
         <primitive object={top} attach="material" />
       </RoundedBox>
 
-      {/* Band under the top: the shadow line in the photo. */}
+      {/* Band under the top, also doubled. */}
       <RoundedBox
-        args={[8.9, 0.28, 8.9]}
+        args={[8.95, 0.55, 8.95]}
         radius={0.05}
         smoothness={2}
-        position={[0, -0.62, 0]}
+        position={[0, -1.25, 0]}
         castShadow
         receiveShadow
       >
         <primitive object={edge} attach="material" />
       </RoundedBox>
 
+      {/* The photographed top, laid flat over the slab: a plane maps the image edge to
+          edge, which a rounded box does not. */}
+      <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[8.6, 8.6]} />
+        <meshStandardMaterial
+          map={surface}
+          roughness={0.45}
+          metalness={0.02}
+          emissive={new THREE.Color("#2a1a10")}
+          emissiveIntensity={0.3}
+        />
+      </mesh>
+
       {legs.map(([lx, lz]) => (
         <RoundedBox
           key={`leg-${lx}-${lz}`}
-          args={[0.75, 5.4, 0.75]}
+          args={[0.85, 5.2, 0.85]}
           radius={0.03}
           smoothness={2}
-          position={[lx, -3.4, lz]}
+          position={[lx, -4.1, lz]}
           castShadow
           receiveShadow
         >
@@ -692,6 +713,7 @@ export function StackTowerGame() {
           />
           <directionalLight position={[-9, 7, -6]} intensity={0.5} color="#8fb4d8" />
           <pointLight position={[0, 4, -12]} intensity={40} color="#ffcf9a" />
+          <pointLight position={[0, 7.5, 6]} intensity={18} color="#ffe6c2" distance={26} decay={2} />
 
           <Scene sim={sim} onMatch={setMatch} onCarry={setCarryUi} />
 
