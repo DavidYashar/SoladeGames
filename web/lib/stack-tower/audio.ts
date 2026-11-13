@@ -24,8 +24,28 @@ export class StackAudio {
 
   /** Diagnostic: how often each of the three events has sounded. */
   private plays = { pull: 0, place: 0, collapse: 0 };
-  get report(): { state: string; plays: typeof this.plays } {
-    return { state: this.state, plays: { ...this.plays } };
+  get report(): {
+    state: string;
+    plays: typeof this.plays;
+    loaded: { pull: boolean; place: boolean; collapse: boolean };
+    collapse: { onset: number; duration: number; seconds: number } | null;
+  } {
+    return {
+      state: this.state,
+      plays: { ...this.plays },
+      loaded: {
+        pull: Boolean(this.pullBuffer),
+        place: Boolean(this.placeBuffer),
+        collapse: Boolean(this.collapseBuffer),
+      },
+      collapse: this.collapseBuffer
+        ? {
+            onset: Number(this.collapseOnset.toFixed(3)),
+            duration: Number(this.collapseBuffer.duration.toFixed(3)),
+            seconds: Number((this.collapseBuffer.duration - this.collapseOnset).toFixed(3)),
+          }
+        : null,
+    };
   }
 
   async unlock(): Promise<void> {
@@ -69,7 +89,7 @@ export class StackAudio {
       const data = await response.arrayBuffer();
       const buffer = await this.ctx.decodeAudioData(data);
       this.collapseBuffer = buffer;
-      this.collapseOnset = this.findOnset(buffer);
+      this.collapseOnset = 0;
     } catch {
       // Keep the synthesised collapse.
     }
@@ -292,7 +312,7 @@ export class StackAudio {
       source.buffer = this.collapseBuffer;
 
       const envelope = this.ctx.createGain();
-      envelope.gain.setValueAtTime(0.85, at);
+      envelope.gain.setValueAtTime(1, at);
 
       source.connect(envelope);
       envelope.connect(this.master!);
