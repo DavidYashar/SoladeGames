@@ -60,9 +60,9 @@ function Hall() {
   const neonMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: "#ff6ba3",
-        emissive: new THREE.Color("#ff2d7a"),
-        emissiveIntensity: 8,
+        color: "#ff4a3a",
+        emissive: new THREE.Color("#ff1a0f"),
+        emissiveIntensity: 9,
         roughness: 0.16,
         metalness: 0,
         clearcoat: 1,
@@ -75,9 +75,9 @@ function Hall() {
   const neonHalos = useMemo(
     () =>
       ([
-        [0.999, 0.55, "#ffe8f1"],
-        [1.05, 0.55, "#ff4d94"],
-        [1.16, 0.24, "#ff2d7a"],
+        [0.999, 0.5, "#ffd2c8"],
+        [1.05, 0.55, "#ff3b2a"],
+        [1.16, 0.26, "#ff1a0f"],
       ] as const).map(
         ([scale, opacity, color]) =>
           ({
@@ -95,6 +95,8 @@ function Hall() {
       ),
     [],
   );
+
+  const neonLight = useRef<THREE.PointLight>(null);
 
   const model = useMemo(() => {
     grain.colorSpace = THREE.SRGBColorSpace;
@@ -206,7 +208,15 @@ function Hall() {
   return (
     <>
       <primitive object={model} />
-      <NeonCycle tube={neonMaterial} halos={neonHalos} />
+      <pointLight
+        ref={neonLight}
+        position={[6.5, 3.7, 7.9]}
+        color="#ff2416"
+        intensity={7}
+        distance={5.5}
+        decay={2}
+      />
+      <NeonCycle tube={neonMaterial} halos={neonHalos} light={neonLight} />
     </>
   );
 }
@@ -346,9 +356,11 @@ export function HallFront() {
 function NeonCycle({
   tube,
   halos,
+  light,
 }: {
   tube: THREE.MeshPhysicalMaterial;
   halos: readonly { material: THREE.MeshBasicMaterial; base: number }[];
+  light: React.RefObject<THREE.PointLight | null>;
 }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime % 12;
@@ -362,14 +374,17 @@ function NeonCycle({
       else if (t < 0.38) level = 0.55;
       else level = 1;
     } else {
-      level = 0;
+      // Never fully dark: a cold tube still holds a dull red glow.
+      level = 0.13;
     }
 
     // A lit tube is never perfectly calm.
     const hum = level > 0 ? 1 + Math.sin(clock.elapsedTime * 43) * 0.025 : 1;
 
-    tube.emissiveIntensity = 8 * level * hum;
+    tube.emissiveIntensity = 9 * level * hum;
     for (const halo of halos) halo.material.opacity = halo.base * level;
+    // The wall behind the sign catches the light while it is on, and just a hint when off.
+    if (light.current) light.current.intensity = 7 * level;
   });
 
   return null;

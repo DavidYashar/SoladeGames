@@ -241,8 +241,8 @@ def _tube(obj, depth: float, name: str):
     # outlines, and the bevel follows them, which is what a neon letter is.
     curve.data.dimensions = "3D"
     curve.data.bevel_depth = depth
-    curve.data.bevel_resolution = 2
-    curve.data.resolution_u = 8
+    curve.data.bevel_resolution = 4
+    curve.data.resolution_u = 12
     bpy.ops.object.convert(target="MESH")
     mesh = bpy.context.active_object
     mesh.name = name
