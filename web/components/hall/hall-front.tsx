@@ -50,6 +50,7 @@ const STATIONS: Station[] = [
 function Hall() {
   const { scene } = useGLTF(HALL_URL);
   const grain = useTexture("/textures/hall-wood.png");
+  const boards = useTexture("/textures/hall-floor-boards.jpg");
   const screens = useTexture([
     "/billboards/stack-tower.png",
     "/billboards/brick-blitz.png",
@@ -60,17 +61,21 @@ function Hall() {
     grain.colorSpace = THREE.SRGBColorSpace;
     grain.anisotropy = 8;
 
-    const floorTex = grain.clone();
-    floorTex.needsUpdate = true;
+    // The lobby floor: warm oak boards, tiled across the room.
+    const floorTex = boards;
+    floorTex.colorSpace = THREE.SRGBColorSpace;
+    floorTex.anisotropy = 8;
     floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
-    floorTex.repeat.set(5, 5);
+    floorTex.repeat.set(7, 6);
+    floorTex.rotation = 0;
+    floorTex.center.set(0.5, 0.5);
 
     const wallTex = grain.clone();
     wallTex.needsUpdate = true;
     wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
     wallTex.repeat.set(6, 2);
 
-    const floor = new THREE.MeshStandardMaterial({ map: floorTex, color: "#d8b489", roughness: 0.58, metalness: 0.05 });
+    const floor = new THREE.MeshStandardMaterial({ map: floorTex, color: "#d9b98f", roughness: 0.5, metalness: 0.05 });
     const wall = new THREE.MeshStandardMaterial({ map: wallTex, color: "#a97a4c", roughness: 0.7, metalness: 0.04 });
     const timber = new THREE.MeshStandardMaterial({ map: grain, color: "#8a5c34", roughness: 0.66, metalness: 0.04 });
     const barWood = new THREE.MeshStandardMaterial({ map: grain, color: "#a06c3c", roughness: 0.5, metalness: 0.05 });
@@ -140,7 +145,7 @@ function Hall() {
       void glyphB;
     });
     return clone;
-  }, [scene, grain, screens]);
+  }, [scene, grain, boards, screens]);
 
   return <primitive object={model} />;
 }
