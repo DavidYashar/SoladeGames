@@ -1085,6 +1085,7 @@ function Pinball({
         }
       };
       (window as unknown as { __audioState?: () => string }).__audioState = () => audio.state;
+      (window as unknown as { __ambience?: () => unknown }).__ambience = () => audio.ambienceStatus;
 
       (window as unknown as { __pin?: () => unknown }).__pin = () => {
         if (!liveBall.current || !world.current) return { x: 0, y: 0, z: 0, vx: 0, vz: 0, charge: 0, mode: "idle", held: false, slingKicks: 0, bumperKicks: 0 };

@@ -20,6 +20,18 @@ export class PinballAudio {
   private rollSource: AudioBufferSourceNode | null = null;
   private rollLevel = 0;
   private lastImpactAt = 0;
+  private ambient: HTMLAudioElement | null = null;
+  private ambientLevel = 0.32;
+
+  /** Diagnostic: how the arcade bed is doing. */
+  get ambienceStatus(): { paused: boolean; volume: number; time: number } | null {
+    if (!this.ambient) return null;
+    return {
+      paused: this.ambient.paused,
+      volume: Number(this.ambient.volume.toFixed(2)),
+      time: Number(this.ambient.currentTime.toFixed(1)),
+    };
+  }
 
   /** Diagnostic: "none" until unlocked, then the AudioContext state. */
   get state(): string {
@@ -55,6 +67,49 @@ export class PinballAudio {
     }
 
     if (this.ctx.state === "suspended") await this.ctx.resume();
+    this.startAmbience();
+  }
+
+  /**
+   * The arcade bed. Streamed through an <audio> element rather than decoded into Web
+   * Audio, so a multi-megabyte track does not sit in memory as raw PCM.
+   */
+  startAmbience(url = "/audio/pinball-ambience.mp3"): void {
+    if (this.ambient) {
+      void this.ambient.play().catch(() => {});
+      return;
+    }
+    const el = new Audio(url);
+    el.loop = true;
+    el.preload = "auto";
+    el.volume = 0; // faded in once playing, so it does not pop
+    this.ambient = el;
+
+    void el
+      .play()
+      .then(() => this.fadeAmbience(this.ambientLevel, 1800))
+      .catch(() => {
+        // Blocked until a gesture; unlock() will try again.
+      });
+  }
+
+  private fadeAmbience(to: number, ms: number): void {
+    const el = this.ambient;
+    if (!el) return;
+    const from = el.volume;
+    const started = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - started) / ms);
+      el.volume = Math.max(0, Math.min(1, from + (to - from) * t));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /** 0 mutes the bed, 1 is full. */
+  setAmbience(level: number): void {
+    this.ambientLevel = Math.max(0, Math.min(1, level));
+    if (this.ambient) this.ambient.volume = this.ambientLevel;
   }
 
   private noiseBuffer(seconds = 2): AudioBuffer {
