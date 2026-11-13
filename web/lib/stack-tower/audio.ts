@@ -10,6 +10,9 @@ export class StackAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private lastKnockAt = 0;
+  private collapseBuffer: AudioBuffer | null = null;
+  private collapseOnset = 0;
+  private loading = false;
 
   get state(): string {
     return this.ctx ? this.ctx.state : "none";
@@ -47,6 +50,42 @@ export class StackAudio {
     }
 
     if (this.ctx.state === "suspended") await this.ctx.resume();
+    void this.loadCollapse();
+  }
+
+  /** The recorded collapse. Falls back to the synthesised one if it cannot load. */
+  private async loadCollapse(): Promise<void> {
+    if (this.loading || !this.ctx) return;
+    this.loading = true;
+    try {
+      const response = await fetch("/audio/stack/plank-fall.wav");
+      if (!response.ok) return;
+      const data = await response.arrayBuffer();
+      const buffer = await this.ctx.decodeAudioData(data);
+      this.collapseBuffer = buffer;
+      this.collapseOnset = this.findOnset(buffer);
+    } catch {
+      // Keep the synthesised collapse.
+    }
+  }
+
+  /** Where the first impact is, so playback does not begin with silence. */
+  private findOnset(buffer: AudioBuffer): number {
+    const data = buffer.getChannelData(0);
+    const rate = buffer.sampleRate;
+    let peak = 0;
+    let peakIndex = 0;
+    for (let i = 0; i < data.length; i += 1) {
+      const v = Math.abs(data[i]);
+      if (v > peak) {
+        peak = v;
+        peakIndex = i;
+      }
+    }
+    const threshold = peak * 0.2;
+    let onset = peakIndex;
+    while (onset > 0 && Math.abs(data[onset]) > threshold) onset -= 1;
+    return Math.max(0, onset / rate - 0.01);
   }
 
   private noiseBuffer(seconds: number): AudioBuffer {
@@ -170,6 +209,20 @@ export class StackAudio {
     if (!this.ctx) return;
     this.plays.collapse += 1;
     const at = this.ctx.currentTime;
+
+    // The recording, played whole: a collapse has a tail worth hearing.
+    if (this.collapseBuffer) {
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.collapseBuffer;
+
+      const envelope = this.ctx.createGain();
+      envelope.gain.setValueAtTime(0.85, at);
+
+      source.connect(envelope);
+      envelope.connect(this.master!);
+      source.start(at, this.collapseOnset);
+      return;
+    }
 
     for (let i = 0; i < 14; i += 1) {
       const when = at + Math.random() * 0.75;
