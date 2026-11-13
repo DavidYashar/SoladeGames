@@ -74,11 +74,11 @@ function Hall() {
 
   const neonHalos = useMemo(
     () =>
-      [
+      ([
         [0.999, 0.55, "#ffe8f1"],
         [1.05, 0.55, "#ff4d94"],
         [1.16, 0.24, "#ff2d7a"],
-      ].map(
+      ] as const).map(
         ([scale, opacity, color]) =>
           ({
             scale,
