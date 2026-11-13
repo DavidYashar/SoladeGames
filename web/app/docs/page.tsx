@@ -69,9 +69,9 @@ export default function DocsPage() {
             product takes no cut of game revenue.
           </p>
           <p>
-            It is not a token, not an NFT sale, and not a payments platform. Earlier drafts
-            of this page described USDC entry fees, a holder share and a platform rake.
-            None of that is built or planned as described.
+            It is not a token, and not a payments platform. The house takes no rake. A
+            published share of every paid entry goes to the holders of the machine being
+            played, which is how the people who back the hall earn from it.
           </p>
         </Section>
 

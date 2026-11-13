@@ -14,21 +14,21 @@ payments, age checks and matchmaking rather than carrying any of that ourselves.
 
 **What we are not:**
 
-- Not a competing payments platform.
-- Not a token, and not a platform rake. We take **no cut of game revenue**.
-- Not an NFT sale. There is no machine mint, no holder pool, no whitelist.
+- Not a competing payments platform. Payments, custody and age checks are Bankroll's.
+- Not a token. There is no game currency and no emissions.
+- Not taking a platform rake. The house does not charge the pot.
 
-The arcade wins when players keep playing. That only works if the money rails are
-someone else's job, run by someone with the licences for it.
+**What we are:** the games, and the machines people can own. Every paid entry is
+split between the prize pool and the holders of the machine being played. The share
+is published before the first entry is taken.
 
-> **A note on earlier drafts.** This document used to describe an arcade on Arc
-> Testnet with its own USDC rails, a 25% NFT holder share and a 15% platform take.
-> That plan is retired, and so is the Arc Testnet claim. What follows describes the
-> product as it exists today.
+The arcade wins when players keep playing. That works when the money rails are
+someone else's job, run by someone with the licences for it, and when the people who
+back the hall have a reason to keep backing it.
 
 ---
 
-## 2. The three machines
+## 2. The three games
 
 All three are playable now, in the browser, at the routes below.
 
@@ -48,7 +48,34 @@ gated behind a player handle, so it is not playable for a first-time visitor.
 
 ---
 
-## 3. What is live today, precisely
+## 3. The machines
+
+A machine is the NFT for a cabinet. It is what turns a tester into someone with a
+stake in the hall being busy.
+
+- **Holders earn from play.** A share of every paid entry on a cabinet goes to the
+  holders of that cabinet's machines. It is paid because the hall is being used, not
+  because a token inflated.
+- **A machine is not an advantage.** It does not raise a score, unlock a board, or buy
+  a leaderboard position. Everyone plays the same board, holders included.
+- **Machines are earned before they are sold.** The first ones are minted by players
+  who earned them during the season, not sold as a promise of profit.
+- **Machines are tradeable.** A normal NFT, owned outright. The secondary market prices
+  a machine against the fees its cabinet actually generates.
+
+**Not decided yet:** the holder share percentage, the mint size, the season rules, and
+whether machines are ever sold directly. The business plan is kept in
+[`docs/archive/Games-Business-Plan.md`](docs/archive/Games-Business-Plan.md) and marked
+in development, because we have not settled it.
+
+**The tension to resolve with Bankroll:** if they take no cut and we take no cut, the
+holder share is still money leaving the pot. Whether that is acceptable on their rails,
+and who funds the art and the season before any fees exist, are the two questions that
+decide this. They are listed in section 7.
+
+---
+
+## 4. What is live today, precisely
 
 - The three cabinets, free to play, no wallet required to start.
 - The hall: a 3D front door, a wooden bar, and three stations you click to enter.
@@ -65,7 +92,7 @@ decision below. There is no live USDC anywhere in this product.
 
 ---
 
-## 4. Why the games are worth putting on your rails
+## 5. Why the games are worth putting on your rails
 
 - **Deterministic boards.** Every board, wall and table is generated from a fixed
   seed, so two players in the same round face the same machine. A score means
@@ -79,7 +106,7 @@ decision below. There is no live USDC anywhere in this product.
 
 ---
 
-## 5. What we would need from Bankroll
+## 6. What we would need from Bankroll
 
 | Capability | Why we are not doing it ourselves |
 |---|---|
@@ -88,7 +115,7 @@ decision below. There is no live USDC anywhere in this product.
 | **Matchmaking and lobbies** | Bankroll already has an audience to match against. |
 | **Custody and payouts** | Someone with the compliance posture has to hold the money. |
 
-## 6. What we bring
+## 7. What we bring
 
 - Three finished, playable games with distinct mechanics.
 - A presentation layer that makes them feel like a room rather than a menu: an
@@ -98,13 +125,13 @@ decision below. There is no live USDC anywhere in this product.
 
 ---
 
-## 7. Open questions for Bankroll
+## 8. Open questions for Bankroll
 
 These are the questions that decide what this becomes. None of them are answered
 by code in this repository.
 
-1. **Revenue split.** If Bankroll takes no cut of game revenue, where does the arcade's
-   share come from, and who sets it?
+1. **The holder share.** A published share of each paid entry goes to machine holders.
+   Is that acceptable on your rails, and who administers the split?
 2. **Settlement model.** Do you settle per round, per session, or per league, and in
    what asset?
 3. **Age gating.** Is it per account, per jurisdiction, or per payment method?
@@ -114,10 +141,13 @@ by code in this repository.
    does the player sign each round?
 6. **Porting.** Do you want the three games as-is, or a single title from this set as a
    first integration?
+7. **Funding the season.** The art, the sound and the machines exist. A season with no
+   fees yet has no holder share to pay out. Does Bankroll fund titles it wants, and on
+   what terms?
 
 ---
 
-## 8. How the code is organised
+## 9. How the code is organised
 
 ```
 web/                    Next.js 16 app (React 19, Tailwind 4)
@@ -147,7 +177,7 @@ needs Postgres.
 
 ---
 
-## 9. Status
+## 10. Status
 
 | Area | State |
 |---|---|
@@ -156,6 +186,7 @@ needs Postgres.
 | Wallet and profile | Solana devnet |
 | Daily puzzle | Present, gated behind a handle |
 | Payments | **Not implemented, by design** |
-| NFT, token, holder share | **Retired** |
+| Machines (NFT, holder share) | Designed, not built |
+| Token | None, and not planned |
 
 *SolAde Games, 13 November 2026. Prepared for review by Bankroll.*
