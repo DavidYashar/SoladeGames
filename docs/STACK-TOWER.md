@@ -6,6 +6,23 @@ was deleted.
 
 ---
 
+## Sound
+
+Three events, all real recordings in `web/public/audio/stack/`, played through a small
+synthesiser wrapper ([web/lib/stack-tower/audio.ts](</C:/Users/yasha/Deepseek harness Projects/arkade/web/lib/stack-tower/audio.ts>)):
+
+| Event | File | Notes |
+|---|---|---|
+| Drawing a plank out | `pull.mp3` | starts at the transient, clipped at 0.55 s, ±5% pitch |
+| Setting a plank on top | `place.mp3` | clipped at 0.5 s, ±3% pitch |
+| The tower coming down | `plank-fall.wav` | played whole, from its first impact |
+
+Every sample is measured on load: the peak is found, playback starts where the sound
+rises out of the noise floor, so none of them open with silence. Each has a synthesised
+fallback, so a missing file degrades to a wooden knock rather than to silence.
+
+Audio starts on the first click or drag — browsers require a gesture.
+
 ## 1. The game
 
 A turn-based tower extraction game against a deterministic opponent.

@@ -14,6 +14,8 @@ export class StackAudio {
   private collapseOnset = 0;
   private placeBuffer: AudioBuffer | null = null;
   private placeOnset = 0;
+  private pullBuffer: AudioBuffer | null = null;
+  private pullOnset = 0;
   private loading = false;
 
   get state(): string {
@@ -54,6 +56,7 @@ export class StackAudio {
     if (this.ctx.state === "suspended") await this.ctx.resume();
     void this.loadCollapse();
     void this.loadPlace();
+    void this.loadPull();
   }
 
   /** The recorded collapse. Falls back to the synthesised one if it cannot load. */
@@ -69,6 +72,21 @@ export class StackAudio {
       this.collapseOnset = this.findOnset(buffer);
     } catch {
       // Keep the synthesised collapse.
+    }
+  }
+
+  /** The recorded sound of a plank being drawn out. */
+  private async loadPull(): Promise<void> {
+    if (!this.ctx || this.pullBuffer) return;
+    try {
+      const response = await fetch("/audio/stack/pull.mp3");
+      if (!response.ok) return;
+      const data = await response.arrayBuffer();
+      const buffer = await this.ctx.decodeAudioData(data);
+      this.pullBuffer = buffer;
+      this.pullOnset = this.findOnset(buffer);
+    } catch {
+      // Keep the synthesised scrape.
     }
   }
 
@@ -179,6 +197,26 @@ export class StackAudio {
     if (!this.ctx) return;
     this.plays.pull += 1;
     const at = this.ctx.currentTime;
+
+    if (this.pullBuffer) {
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.pullBuffer;
+      source.playbackRate.value = 0.95 + Math.random() * 0.1;
+
+      const envelope = this.ctx.createGain();
+      envelope.gain.setValueAtTime(0, at);
+      envelope.gain.linearRampToValueAtTime(0.9, at + 0.01);
+      // Cut at 0.55 s: the drag lasts about that long.
+      envelope.gain.setValueAtTime(0.9, at + 0.35);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
+
+      source.connect(envelope);
+      envelope.connect(this.master!);
+      source.start(at, this.pullOnset);
+      source.stop(at + 0.57);
+      return;
+    }
+
 
     // The slide: filtered noise, wavering as the grain catches.
     const ctx = this.ctx;
