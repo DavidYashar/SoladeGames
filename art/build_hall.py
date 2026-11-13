@@ -88,6 +88,87 @@ def join(objects, name):
     return joined
 
 
+def build_facade(parts):
+    """The front of the bar: a plank wall with a doorway, a lit sign and wall lamps.
+
+    Sits on the open side of the room (Blender +Y), so the camera outside looks through
+    the opening and sees the hall beyond it.
+    """
+    fy = ROOM_D / 2 - 0.2
+    opening_w, opening_h = 4.4, 3.4
+    face_w, face_h = 27.0, 9.5
+
+    # Wall either side of the opening, plus the lintel above it.
+    side_w = (face_w - opening_w) / 2
+    left = box("FacadeLeft", (side_w, 0.4, face_h), (-(opening_w / 2 + side_w / 2), fy, face_h / 2))
+    right = box("FacadeRight", (side_w, 0.4, face_h), (opening_w / 2 + side_w / 2, fy, face_h / 2))
+    lintel = box("FacadeLintel", (opening_w, 0.4, face_h - opening_h), (0, fy, opening_h + (face_h - opening_h) / 2))
+    parts += [left, right, lintel]
+
+    # Vertical planks across the front, so it matches the inside walls.
+    planks = []
+    for i in range(40):
+        px = -face_w / 2 + 0.34 + i * ((face_w - 0.68) / 39)
+        if abs(px) < opening_w / 2 + 0.1:
+            continue
+        planks.append(box(f"FacadePlank{i}", (0.32, 0.06, face_h - 0.2), (px, fy + 0.24, face_h / 2)))
+    parts.append(join(planks, "FacadePlanks"))
+
+    # Door casing.
+    trim_l = box("FacadeTrimL", (0.26, 0.62, opening_h + 0.3), (-opening_w / 2 - 0.13, fy + 0.2, (opening_h + 0.3) / 2))
+    trim_r = box("FacadeTrimR", (0.26, 0.62, opening_h + 0.3), (opening_w / 2 + 0.13, fy + 0.2, (opening_h + 0.3) / 2))
+    trim_t = box("FacadeTrimT", (opening_w + 0.78, 0.62, 0.3), (0, fy + 0.2, opening_h + 0.15))
+    parts += [trim_l, trim_r, trim_t]
+
+    # The board above the door.
+    board = box("FacadeSignBoard", (6.4, 0.22, 1.05), (0, fy + 0.42, 4.32))
+    bevel(board, 0.02, 2)
+    parts.append(board)
+
+    bpy.ops.object.text_add(location=(0, fy + 0.56, 4.16), rotation=(math.pi / 2, 0, math.pi))
+    text = bpy.context.active_object
+    text.data.body = "SOLADE GAMES"
+    text.data.align_x = "CENTER"
+    text.data.size = 0.52
+    text.data.extrude = 0.0
+    parts.append(_tube(text, 0.016, "FacadeSignText"))
+
+    # Wall lamps either side.
+    shades = []
+    brackets = []
+    for i, sx in enumerate((-3.9, 3.9)):
+        brackets.append(box(f"FacadeBracket{i}", (0.1, 0.1, 0.5), (sx, fy + 0.3, 3.5)))
+        bpy.ops.mesh.primitive_cone_add(
+            vertices=24, radius1=0.3, radius2=0.1, depth=0.26, location=(sx, fy + 0.42, 3.32)
+        )
+        cone = bpy.context.active_object
+        cone.name = f"FacadeLamp{i}"
+        shades.append(cone)
+    parts.append(join(brackets, "FacadeBrackets"))
+    parts.append(join(shades, "FacadeLamps"))
+
+    ground = box("Apron", (face_w + 6, 13.0, 0.3), (0, fy + 6.6, -0.15))
+    parts.append(ground)
+
+    # Plants either side of the door.
+    pots = []
+    leaves = []
+    for i, sx in enumerate((-5.4, 5.4)):
+        pots.append(cyl(f"FacadePot{i}", 0.42, 0.8, (sx, fy + 0.9, 0.4), vertices=18))
+        for j in range(12):
+            a = j * 0.52
+            leaves.append(
+                box(
+                    f"FacadeLeaf{i}{j}",
+                    (0.1, 0.34, 0.9),
+                    (sx + math.cos(a) * 0.28, fy + 0.9 + math.sin(a) * 0.28, 1.25),
+                    rot=(0.45 * math.sin(a), 0.45 * math.cos(a), 0),
+                )
+            )
+    parts.append(join(pots, "FacadePots"))
+    parts.append(join(leaves, "FacadeLeaves"))
+
+
 def build_room(parts):
     floor = box("Floor", (ROOM_W, ROOM_D, 0.3), (0, 0, -0.15))
     parts.append(floor)
@@ -355,6 +436,7 @@ def main() -> None:
     clear()
     parts = []
     build_room(parts)
+    build_facade(parts)
     build_bar(parts)
     build_lamps(parts)
     build_pool_table(parts, (0.0, -1.4))

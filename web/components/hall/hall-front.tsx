@@ -131,6 +131,20 @@ function Hall() {
     const glyphB = new THREE.MeshBasicMaterial({ map: screens[1], toneMapped: false });
     const glyphC = new THREE.MeshBasicMaterial({ map: screens[2], toneMapped: false });
     const ball = new THREE.MeshStandardMaterial({ color: "#d8d2c4", roughness: 0.35, metalness: 0.2 });
+    const facadeWood = new THREE.MeshStandardMaterial({
+      map: grain,
+      color: "#b8834e",
+      roughness: 0.55,
+      metalness: 0.04,
+    });
+    const leaf = new THREE.MeshStandardMaterial({ color: "#2f5a2c", roughness: 0.85, metalness: 0 });
+    const potMat = new THREE.MeshStandardMaterial({ color: "#2a2a2c", roughness: 0.6, metalness: 0.2 });
+    const signGlow = new THREE.MeshStandardMaterial({
+      color: "#ffd9a6",
+      emissive: new THREE.Color("#ffab5e"),
+      emissiveIntensity: 6,
+      toneMapped: false,
+    });
     const strip = new THREE.MeshStandardMaterial({
       color: "#ffe1b8",
       emissive: new THREE.Color("#ffb877"),
@@ -177,6 +191,14 @@ function Hall() {
       else if (name.startsWith("JengaTop")) mesh.material = barWood;
       else if (name.startsWith("Jenga")) mesh.material = timber;
       else if (name === "NeonSign" || name === "NeonFrame") mesh.material = neon;
+      else if (name === "FacadeSignText") mesh.material = signGlow;
+      else if (name === "FacadeSignBoard") mesh.material = timber;
+      else if (name.startsWith("FacadeTrim")) mesh.material = timber;
+      else if (name.startsWith("FacadeLamp") || name.startsWith("FacadeBracket")) mesh.material = shade;
+      else if (name.startsWith("FacadePot")) mesh.material = potMat;
+      else if (name.startsWith("FacadeLeaf")) mesh.material = leaf;
+      else if (name === "Apron") mesh.material = floor;
+      else if (name.startsWith("Facade")) mesh.material = facadeWood;
       else if (name === "SignFrame") mesh.material = cabinet;
       else if (name.startsWith("BarPlank") || name === "BarWallPlanks") mesh.material = barWood;
       else if (name.startsWith("BarLed") || name.startsWith("BarStrip")) mesh.material = strip;
@@ -221,19 +243,36 @@ function Hall() {
 }
 
 /** Camera that starts at the door and flies into a chosen station. */
-function Rig({ flying, onArrived }: { flying: Station | null; onArrived: () => void }) {
+function Rig({
+  flying,
+  entered,
+  onArrived,
+}: {
+  flying: Station | null;
+  entered: boolean;
+  onArrived: () => void;
+}) {
   const { camera } = useThree();
-  const to = useRef(new THREE.Vector3(0, 1.7, -7.4));
-  const look = useRef(new THREE.Vector3(0, 1.6, 3));
-  const target = useRef(new THREE.Vector3(0, 1.7, -7.4));
-  const targetLook = useRef(new THREE.Vector3(0, 1.6, 3));
-  const pos = useRef(new THREE.Vector3(0, 1.7, -7.4));
-  const lookNow = useRef(new THREE.Vector3(0, 1.6, 3));
+  // Outside the door at first, then through it into the hall.
+  const OUTSIDE: [number, number, number] = [0, 2.1, -21];
+  const OUTSIDE_LOOK: [number, number, number] = [0, 2.6, -8.3];
+  const INSIDE: [number, number, number] = [0, 1.7, -7.2];
+  const INSIDE_LOOK: [number, number, number] = [0, 1.6, 2.5];
+
+  const to = useRef(new THREE.Vector3());
+  const look = useRef(new THREE.Vector3());
+  const target = useRef(new THREE.Vector3(...OUTSIDE));
+  const targetLook = useRef(new THREE.Vector3(...OUTSIDE_LOOK));
+  const pos = useRef(new THREE.Vector3(...OUTSIDE));
+  const lookNow = useRef(new THREE.Vector3(...OUTSIDE_LOOK));
 
   useFrame((_, delta) => {
     if (flying) {
       target.current.set(...flying.from);
       targetLook.current.set(...flying.look);
+    } else if (entered) {
+      target.current.set(...INSIDE);
+      targetLook.current.set(...INSIDE_LOOK);
     }
     const k = Math.min(1, delta * 2.4);
     pos.current.lerp(target.current, k);
@@ -268,7 +307,7 @@ export function HallFront() {
       <Canvas
         shadows="percentage"
         dpr={[1, 2]}
-        camera={{ position: [0, 1.7, -7.4], fov: 55, near: 0.1, far: 80 }}
+        camera={{ position: [0, 2.1, -21], fov: 55, near: 0.1, far: 90 }}
         gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       >
         <color attach="background" args={["#070506"]} />
@@ -285,6 +324,13 @@ export function HallFront() {
         <pointLight position={[-2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7.5} decay={2} />
         <pointLight position={[2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7} decay={2} />
 
+        {/* The two lamps beside the door. */}
+        <pointLight position={[-3.9, 3.3, -8.9]} intensity={12} color="#ffcf9a" distance={7} decay={2} />
+        <pointLight position={[3.9, 3.3, -8.9]} intensity={12} color="#ffcf9a" distance={7} decay={2} />
+
+        {/* Spill from the hall, so the interior is legible through the doorway. */}
+        <pointLight position={[0, 2.2, -6.6]} intensity={10} color="#ffc98a" distance={7} decay={2} />
+
         {/* The neon's own spill, not a lamp. */}
         <pointLight position={[4.9, 2.6, 7.6]} intensity={6} color="#ff2d55" distance={7} decay={2} />
 
@@ -296,6 +342,7 @@ export function HallFront() {
 
         <Rig
           flying={flying}
+          entered={entered}
           onArrived={() => {
             if (flying) router.push(flying.route);
           }}
@@ -303,22 +350,25 @@ export function HallFront() {
       </Canvas>
 
       {/* Entrance */}
+      {/* The entrance: the doorway stays visible, the words sit at the foot of the frame. */}
       <div
-        className={`absolute inset-0 z-10 flex flex-col items-center justify-center bg-black transition-opacity duration-700 ${
+        className={`absolute inset-x-0 bottom-0 z-10 flex flex-col items-center bg-gradient-to-t from-black via-black/75 to-transparent pb-14 pt-32 transition-opacity duration-700 ${
           entered ? "pointer-events-none opacity-0" : "opacity-100"
         }`}
       >
-        <p className="font-display text-[11px] uppercase tracking-[0.5em] text-[#ff2d55]">Arc-ade</p>
-        <h1 className="font-display mt-4 text-4xl uppercase tracking-[0.2em] text-zinc-100 sm:text-6xl">
+        <p className="font-display text-[11px] uppercase tracking-[0.5em] text-[#ff4d3a]">
+          Solade Games
+        </p>
+        <h1 className="font-display mt-3 text-4xl uppercase tracking-[0.18em] text-zinc-100 sm:text-5xl">
           The Hall
         </h1>
-        <p className="mt-3 max-w-sm text-center text-sm text-zinc-500">
+        <p className="mt-3 max-w-sm text-center text-sm text-zinc-400">
           Three machines. Free to play. Solana settlement.
         </p>
         <button
           type="button"
           onClick={() => setEntered(true)}
-          className="font-display mt-10 border border-[#ff2d55]/60 px-8 py-3 text-[11px] uppercase tracking-[0.35em] text-[#ff8fa3] transition-colors hover:border-[#ff2d55] hover:bg-[#ff2d55]/10 hover:text-white"
+          className="font-display mt-8 border border-[#ff4d3a]/60 px-8 py-3 text-[11px] uppercase tracking-[0.35em] text-[#ff9d8a] transition-colors hover:border-[#ff4d3a] hover:bg-[#ff4d3a]/10 hover:text-white"
         >
           Walk in
         </button>
