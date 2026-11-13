@@ -559,21 +559,22 @@ function TopArrows() {
   const geometry = useMemo(() => chevronGeometry(), []);
   const arrows = useMemo(
     () => [
-      { z: M(-0.128), colour: "#22a7e0", shade: "#12659a" },
-      { z: M(0.128), colour: "#e8403f", shade: "#9d211f" },
+      // rot is the in-plane turn: -90 deg faces +z (the left rail), +90 faces -z.
+      { z: M(-0.128), colour: "#22a7e0", shade: "#12659a", rot: Math.PI / 2 },
+      { z: M(0.128), colour: "#e8403f", shade: "#9d211f", rot: -Math.PI / 2 },
     ],
     [],
   );
 
   return (
     <group>
-      {arrows.map(({ z, colour, shade }) => (
+      {arrows.map(({ z, colour, shade, rot }) => (
         <group key={z} position={[-0.455, PLAY.y + 0.0088, z]}>
           {/* The darker offset reads as the raised edge in the artwork. */}
-          <mesh geometry={geometry} position={[0.006, -0.0004, 0.004]} rotation={[-Math.PI / 2, 0, Math.PI]}>
+          <mesh geometry={geometry} position={[0.004, -0.0004, 0.006]} rotation={[-Math.PI / 2, 0, rot]}>
             <meshBasicMaterial color={shade} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
           </mesh>
-          <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, Math.PI]}>
+          <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, rot]}>
             <meshBasicMaterial color={colour} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
           </mesh>
         </group>
