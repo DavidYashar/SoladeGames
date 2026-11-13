@@ -1,13 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+.turbo/
+
+# Environment files. The example is committed; real values never are.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
 # Foundry build artifacts
 contracts/out/
 contracts/cache/
 
+# Blender: renders and autosaves. The scripts and exported models are committed.
+art/out/
+art/renders/
+*.blend1
+
+# Test and tooling output
+test-results/
+playwright-report/
+.playwright/
+coverage/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
 
-# Local npm logs
-npm-debug.log*
-
-# Blender render output
-art/out/
+# Local scratch work
+.scratch/
