@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "ARC_ADE — skill arcade and daily puzzle league on Arc";
+export const alt = "SolAde Games — three skill games in an arcade hall";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -10,17 +10,6 @@ export const contentType = "image/png";
  * depends on the network.
  */
 export default async function OpengraphImage() {
-  // The exact robot-A from the brand mark, inlined so the card never
-  // depends on a font or a network fetch.
-  const robotSvg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7 9">` +
-    `<rect x="3.2" y="0" width="0.6" height="1.3" fill="#ffffff"/>` +
-    `<path d="M3.5 1.15 L6.6 2.75 V8.85 H0.4 V2.75 Z" fill="#ffffff"/>` +
-    `<rect x="1.2" y="3.7" width="4.6" height="3.8" fill="#000000"/>` +
-    `<rect x="1.95" y="4.7" width="1.05" height="1.5" fill="#22e0ff"/>` +
-    `<rect x="4" y="4.7" width="1.05" height="1.5" fill="#22e0ff"/>` +
-    `</svg>`;
-  const robotUri = `data:image/svg+xml;utf8,${encodeURIComponent(robotSvg)}`;
 
   return new ImageResponse(
     (
@@ -77,18 +66,7 @@ export default async function OpengraphImage() {
             lineHeight: 1,
           }}
         >
-          <span style={{ display: "flex" }}>ARC</span>
-
-          {/* robot-A */}
-          <img
-            src={robotUri}
-            width={102}
-            height={131}
-            style={{ marginTop: 6 }}
-            alt=""
-          />
-
-          <span style={{ display: "flex" }}>DE</span>
+          <span style={{ display: "flex" }}>SOLADE</span>
         </div>
 
         {/* gradient underscore */}
@@ -112,7 +90,7 @@ export default async function OpengraphImage() {
             display: "flex",
           }}
         >
-          Skill arcade · Daily puzzle league · USDC on Arc
+          Three skill games · Free to play · Solana devnet
         </div>
       </div>
     ),

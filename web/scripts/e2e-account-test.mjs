@@ -17,7 +17,7 @@ const base = process.argv[2] ?? "http://localhost:3000";
 /** Must match buildRegisterMessage() in lib/account.ts exactly. */
 function buildRegisterMessage(username, issuedAt) {
   return [
-    "ARC-ADE",
+    "SolAde Games",
     "Claim your player handle",
     "",
     `Handle: ${username}`,

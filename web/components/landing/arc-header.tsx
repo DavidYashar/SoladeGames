@@ -8,11 +8,8 @@ import { ConnectWallet } from "@/components/connect-wallet";
 
 /** Sticky top bar: brand, nav, live chain badge, wallet — with a mobile hamburger menu. */
 const NAV = [
-  { href: "/#machines", label: "Machines" },
-  { href: "/#tournament", label: "Tonight" },
+  { href: "/games/stack-tower", label: "Machines" },
   { href: "/play", label: "Puzzle" },
-  { href: "/#own", label: "Own" },
-  { href: "/#plan", label: "Plan" },
   { href: "/docs", label: "Docs" },
 ] as const;
 
@@ -22,7 +19,7 @@ export function ArcHeader() {
   return (
     <header className="sticky top-0 z-40 bg-black/85 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
-        <Link href="/" className="flex items-center gap-2.5" aria-label="ARC_ADE home">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="SolAde Games home">
           <SoladeWordmark className="h-5 w-auto text-white sm:h-[22px]" />
         </Link>
 

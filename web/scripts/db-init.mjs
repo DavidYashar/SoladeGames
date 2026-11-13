@@ -1,5 +1,5 @@
 /**
- * Provisions the ARC-ADE Postgres schema.
+ * Provisions the SolAde Games Postgres schema.
  *
  *   node scripts/db-init.mjs             → create database + tables (idempotent)
  *   node scripts/db-init.mjs --seed      → also insert demo data (dev only)

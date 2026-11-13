@@ -9,8 +9,6 @@
     "lint": "eslint",
     "db:init": "node scripts/db-init.mjs",
     "solana:devnet": "node scripts/solana-devnet.mjs",
-    "settle": "node scripts/settle-league.mjs",
-    "e2e:league": "node scripts/e2e-league-test.mjs",
     "e2e:account": "node scripts/e2e-account-test.mjs"
   },
   "dependencies": {
