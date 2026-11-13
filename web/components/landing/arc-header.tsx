@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { SoladeWordmark, RobotMark } from "@/components/brand/arcade-logo";
+import { href } from "@/lib/href";
 import { ConnectWallet } from "@/components/connect-wallet";
 
 /** Sticky top bar: brand, nav, live chain badge, wallet — with a mobile hamburger menu. */
@@ -36,7 +37,7 @@ export function ArcHeader() {
           {NAV.map((n) => (
             <Link
               key={n.label}
-              href={n.href}
+              href={href(n.href)}
               className="arcade-underline font-display relative py-1 text-[11px] uppercase tracking-[0.14em] text-zinc-400 transition-colors hover:text-white"
             >
               {n.label}
@@ -104,7 +105,7 @@ export function ArcHeader() {
           {NAV.map((n) => (
             <Link
               key={n.label}
-              href={n.href}
+              href={href(n.href)}
               onClick={() => setOpen(false)}
               className="font-display w-full max-w-xs rounded-sm px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >

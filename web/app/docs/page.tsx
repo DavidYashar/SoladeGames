@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ArcHeader } from "@/components/landing/arc-header";
 import { Footer } from "@/components/landing/footer";
+import { href } from "@/lib/href";
 
 const GAMES = [
   {
@@ -80,7 +81,7 @@ export default function DocsPage() {
             {GAMES.map((game) => (
               <li key={game.name}>
                 <Link
-                  href={game.route}
+                  href={href(game.route)}
                   className="font-semibold text-zinc-100 underline-offset-4 hover:text-[#ffb066] hover:underline"
                 >
                   {game.name}
@@ -92,7 +93,7 @@ export default function DocsPage() {
           <p>
             A daily puzzle sits at{" "}
             <Link
-              href="/play"
+              href={href("/play")}
               className="text-zinc-200 underline decoration-[#7a4a2c] underline-offset-4 hover:text-[#ffb066]"
             >
               /play

@@ -7,6 +7,8 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
+import { href } from "@/lib/href";
+
 const BADGE_URL = "/models/hall/logo_badge.glb";
 const HALL_URL = "/models/hall/hall.glb";
 
@@ -439,7 +441,7 @@ export function HallFront() {
           flying={flying}
           entered={entered}
           onArrived={() => {
-            if (flying) router.push(flying.route);
+            if (flying) router.push(href(flying.route));
           }}
         />
       </Canvas>
