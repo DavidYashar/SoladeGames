@@ -177,23 +177,23 @@ function TableUnderTower() {
   );
 
   const legs: [number, number][] = [
-    [3.55, 3.55],
-    [3.55, -3.55],
-    [-3.55, 3.55],
-    [-3.55, -3.55],
+    [8.1, 8.1],
+    [8.1, -8.1],
+    [-8.1, 8.1],
+    [-8.1, -8.1],
   ];
 
   return (
     <group>
       {/* Top slab: a box, not a rounded box, because a box maps the board across each
           face properly. Upper face flush with y = 0. */}
-      <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
-        <boxGeometry args={[8.9, 1.0, 8.9]} />
+      <mesh position={[0, -0.25, 0]} castShadow receiveShadow>
+        <boxGeometry args={[17.8, 0.5, 17.8]} />
         <primitive object={top} attach="material" />
       </mesh>
 
       {legs.map(([lx, lz]) => (
-        <mesh key={`leg-${lx}-${lz}`} position={[lx, -4.1, lz]} castShadow receiveShadow>
+        <mesh key={`leg-${lx}-${lz}`} position={[lx, -3.1, lz]} castShadow receiveShadow>
           <boxGeometry args={[0.85, 5.2, 0.85]} />
           <primitive object={timber} attach="material" />
         </mesh>
@@ -647,7 +647,7 @@ export function StackTowerGame() {
   }, [load]);
 
   const camera = useMemo(
-    () => ({ position: [17, 11.5, 17] as [number, number, number], fov: 42 }),
+    () => ({ position: [25, 15, 25] as [number, number, number], fov: 42 }),
     [],
   );
 
@@ -696,8 +696,8 @@ export function StackTowerGame() {
           </mesh>
           <ContactShadows
             position={[0, 0.012, 0]}
-            opacity={0.55}
-            scale={22}
+            opacity={0.5}
+            scale={30}
             blur={2.6}
             far={7}
             resolution={512}
@@ -705,7 +705,7 @@ export function StackTowerGame() {
           />
 
           <OrbitControls
-            target={[0, 4.9, 0]}
+            target={[0, 5.6, 0]}
             enablePan={false}
             minDistance={9}
             maxDistance={30}
