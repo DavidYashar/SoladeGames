@@ -554,22 +554,23 @@ function chevronGeometry() {
   return new THREE.ShapeGeometry(shape);
 }
 
+/**
+ * The two chevron inlays above the top bumper. Each faces outward and kicks the ball
+ * that way, so the visuals and the physics read one list.
+ */
+const TOP_ARROWS = [
+  { x: -0.455, z: M(0.128), side: 1 as const, colour: "#e8403f", shade: "#9d211f", rot: -Math.PI / 2 },
+  { x: -0.455, z: M(-0.128), side: -1 as const, colour: "#22a7e0", shade: "#12659a", rot: Math.PI / 2 },
+];
+
 /** Two chevron inlays above the top bumper, in the colours of the reference sheet. */
 function TopArrows() {
   const geometry = useMemo(() => chevronGeometry(), []);
-  const arrows = useMemo(
-    () => [
-      // rot is the in-plane turn: -90 deg faces +z (the left rail), +90 faces -z.
-      { z: M(-0.128), colour: "#22a7e0", shade: "#12659a", rot: Math.PI / 2 },
-      { z: M(0.128), colour: "#e8403f", shade: "#9d211f", rot: -Math.PI / 2 },
-    ],
-    [],
-  );
 
   return (
     <group>
-      {arrows.map(({ z, colour, shade, rot }) => (
-        <group key={z} position={[-0.455, PLAY.y + 0.0088, z]}>
+      {TOP_ARROWS.map(({ x, z, colour, shade, rot }) => (
+        <group key={z} position={[x, PLAY.y + 0.0088, z]}>
           {/* The darker offset reads as the raised edge in the artwork. */}
           <mesh geometry={geometry} position={[0.004, -0.0004, 0.006]} rotation={[-Math.PI / 2, 0, rot]}>
             <meshBasicMaterial color={shade} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
@@ -785,6 +786,7 @@ function Pinball({
   const bumperCooldown = useRef<Record<number, number>>({});
   const stalled = useRef(0);
   const slingCooldown = useRef<Record<number, number>>({});
+  const arrowCooldown = useRef<Record<number, number>>({});
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
   const mode = useRef<"idle" | "play">("idle");
@@ -801,6 +803,7 @@ function Pinball({
     let cancelled = false;
     let myWorld: RAPIER.World | null = null;
     let myBall: RAPIER.RigidBody | null = null;
+    let myEvents: RAPIER.EventQueue | null = null;
 
     void (async () => {
       await RAPIER.init();
@@ -1004,7 +1007,10 @@ function Pinball({
       world.current = w;
       myWorld = w;
       myBall = ball;
-      events.current = new RAPIER.EventQueue(true);
+      // The queue belongs to its world; a queue from a freed world corrupts wasm when
+      // it is handed to a different one.
+      myEvents = new RAPIER.EventQueue(true);
+      events.current = myEvents;
       shared.ball = ball;
       liveBall.current = ball;
       const ballColliderRef = ballCollider;
@@ -1054,19 +1060,27 @@ function Pinball({
         z: number,
       ) => {
         const ball = liveBall.current;
-        if (!ball) return;
+        if (!ball || !world.current) return;
         mode.current = "play";
-        ball.setTranslation({ x, y: PLAY.y + 0.03, z }, true);
-        ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        try {
+          ball.setTranslation({ x, y: PLAY.y + 0.03, z }, true);
+          ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        } catch {
+          // A handle from a world that has been freed; ignore rather than throw.
+        }
       };
       (window as unknown as { __kick?: (vx: number, vz: number) => void }).__kick = (
         vx: number,
         vz: number,
       ) => {
         const ball = liveBall.current;
-        if (!ball) return;
+        if (!ball || !world.current) return;
         mode.current = "play";
-        ball.setLinvel({ x: vx, y: 0, z: vz }, true);
+        try {
+          ball.setLinvel({ x: vx, y: 0, z: vz }, true);
+        } catch {
+          // Freed world; ignore.
+        }
       };
       (window as unknown as { __pin?: () => unknown }).__pin = () => {
         if (!liveBall.current || !world.current) return { x: 0, y: 0, z: 0, vx: 0, vz: 0, charge: 0, mode: "idle", held: false, slingKicks: 0, bumperKicks: 0 };
@@ -1144,6 +1158,7 @@ function Pinball({
       cleanups.current = [];
       myWorld?.free();
       if (world.current === myWorld) world.current = null;
+      if (events.current === myEvents) events.current = null;
       if (shared.ball === myBall) shared.ball = null;
       // Drop the live handle too, and the debug hooks with it: a stale handle points
       // into freed wasm memory and throws on the next read.
@@ -1214,11 +1229,14 @@ function Pinball({
     if (leftFlip.current) leftFlip.current.rotation.y = f.left;
     if (rightFlip.current) rightFlip.current.rotation.y = f.right;
 
+    const queue = events.current;
+    if (!queue) return;
+
     acc.current += Math.min(delta, 0.05);
     let steps = 0;
     try {
       while (acc.current >= w.timestep && steps < 12) {
-        w.step(events.current ?? undefined);
+        w.step(queue);
         acc.current -= w.timestep;
         steps += 1;
       }
@@ -1231,7 +1249,6 @@ function Pinball({
       return;
     }
 
-    const queue = events.current;
     if (queue) {
       queue.drainCollisionEvents((h1, h2, started) => {
         if (!started) return;
@@ -1386,6 +1403,17 @@ function Pinball({
           true,
         );
         ball.setLinvel({ x: vx, y: 0.15, z: vz }, true);
+      }
+
+      // The chevrons fire the ball out to their own side, gently.
+      for (const arrow of TOP_ARROWS) {
+        const ax = t.x - arrow.x;
+        const az = t.z - arrow.z;
+        if (Math.hypot(ax, az) > 0.055) continue;
+        if (now < (arrowCooldown.current[arrow.side] ?? 0)) continue;
+        arrowCooldown.current[arrow.side] = now + 300;
+
+        ball.setLinvel({ x: -0.55, y: 0.12, z: arrow.side * 2.8 }, true);
       }
     }
 
