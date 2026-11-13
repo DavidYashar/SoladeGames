@@ -447,13 +447,15 @@ export function HallFront() {
       {/* Entrance */}
       {/* Out again: the same door, from the other side. */}
       {entered && (
-        <button
-          type="button"
-          onClick={leave}
-          className="font-display absolute left-6 top-6 z-10 inline-flex items-center gap-2 border border-zinc-700/60 bg-black/40 px-4 py-2 text-[10px] uppercase tracking-[0.3em] text-zinc-400 transition-colors hover:border-[#ff4d3a]/60 hover:text-white"
-        >
-          <span aria-hidden="true">&larr;</span> Leave
-        </button>
+        <div className="absolute left-6 top-6 z-10">
+          <button
+            type="button"
+            onClick={leave}
+            className="arcade-btn-ghost !py-2 !text-[10px] tracking-[0.3em]"
+          >
+            <span aria-hidden="true">&larr;</span>&nbsp;Leave
+          </button>
+        </div>
       )}
 
       {/* The entrance: the doorway stays visible, the words sit at the foot of the frame. */}
@@ -462,7 +464,7 @@ export function HallFront() {
           entered ? "pointer-events-none opacity-0" : "opacity-100"
         }`}
       >
-        <p className="font-display text-[11px] uppercase tracking-[0.5em] text-[#ff4d3a]">
+        <p className="font-display text-[11px] uppercase tracking-[0.45em] text-[#ff7a3d]">
           Solade Games
         </p>
         <h1 className="font-display mt-3 text-4xl uppercase tracking-[0.18em] text-zinc-100 sm:text-5xl">
@@ -474,7 +476,7 @@ export function HallFront() {
         <button
           type="button"
           onClick={enter}
-          className="font-display pointer-events-auto mt-8 border border-[#ff4d3a]/60 px-8 py-3 text-[11px] uppercase tracking-[0.35em] text-[#ff9d8a] transition-colors hover:border-[#ff4d3a] hover:bg-[#ff4d3a]/10 hover:text-white"
+          className="arcade-btn pointer-events-auto mt-8"
         >
           Walk in
         </button>
@@ -493,7 +495,7 @@ export function HallFront() {
               key={station.route}
               type="button"
               onClick={() => pick(station)}
-              className="font-display text-[11px] uppercase tracking-[0.2em] text-zinc-400 transition-colors hover:text-white"
+              className="font-display text-[11px] uppercase tracking-[0.2em] text-[#cfb49a] transition-colors hover:text-[#ffb066]"
             >
               {station.name}
             </button>
@@ -579,6 +581,7 @@ function Lamp({
 /** The Solana badge above the door: a 3D medallion carrying the supplied artwork. */
 function Badge() {
   const art = useTexture("/textures/solana-badge.png");
+  const ringWood = useTexture("/textures/hall-wood.png");
   art.colorSpace = THREE.SRGBColorSpace;
   art.anisotropy = 8;
 
@@ -595,13 +598,17 @@ function Badge() {
     });
     material.userData.base = 0.55;
     return material;
-  }, [art]);
+  }, [art, ringWood]);
 
   const materials = useMemo(() => {
+    // A turned wooden frame, so the badge belongs on this wall.
+    ringWood.wrapS = ringWood.wrapT = THREE.RepeatWrapping;
+    ringWood.repeat.set(3, 1);
     const rim = new THREE.MeshStandardMaterial({
-      color: "#6f6154",
-      roughness: 0.45,
-      metalness: 0.4,
+      map: ringWood,
+      color: "#c08a52",
+      roughness: 0.52,
+      metalness: 0.08,
     });
     const face = faceMaterial;
     const back = new THREE.MeshStandardMaterial({ color: "#2a2622", roughness: 0.6, metalness: 0.3 });
@@ -612,11 +619,15 @@ function Badge() {
     <group position={[0, 5.95, -8.46]}>
       {/* The body of the medallion: a disc with real thickness. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} material={materials}>
-        <cylinderGeometry args={[0.95, 0.95, 0.24, 64]} />
+        <cylinderGeometry args={[0.95, 0.95, 0.24, 128]} />
+      </mesh>
+      {/* A rounded lip of the same wood, catching the light on the rim. */}
+      <mesh position={[0, 0, -0.115]} material={materials[0]}>
+        <torusGeometry args={[0.95, 0.048, 24, 128]} />
       </mesh>
       {/* The artwork, laid on the face so it sits inside the rim. */}
       <mesh position={[0, 0.001, -0.121]} rotation={[0, Math.PI, 0]} material={faceMaterial}>
-        <circleGeometry args={[0.9, 64]} />
+        <circleGeometry args={[0.9, 128]} />
       </mesh>
       <NeonCycle tubes={[faceMaterial]} halos={[]} />
     </group>
