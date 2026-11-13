@@ -141,6 +141,81 @@ function Plank({
   );
 }
 
+/** The table, built once: shared wood material, four legs, a banded top. */
+function TableUnderTower() {
+  const grain = useMemo(() => makeWoodTextures(), []);
+  const top = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: grain.map,
+        roughnessMap: grain.roughnessMap,
+        color: "#d3a469",
+        roughness: 0.58,
+        metalness: 0.02,
+      }),
+    [grain],
+  );
+  const edge = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        map: grain.map,
+        color: "#8a6039",
+        roughness: 0.7,
+        metalness: 0.02,
+      }),
+    [grain],
+  );
+
+  const legs: [number, number][] = [
+    [3.55, 3.55],
+    [3.55, -3.55],
+    [-3.55, 3.55],
+    [-3.55, -3.55],
+  ];
+
+  return (
+    <group>
+      {/* Top slab, its upper face flush with y = 0. */}
+      <RoundedBox
+        args={[8.6, 0.5, 8.6]}
+        radius={0.07}
+        smoothness={3}
+        position={[0, -0.25, 0]}
+        castShadow
+        receiveShadow
+      >
+        <primitive object={top} attach="material" />
+      </RoundedBox>
+
+      {/* Band under the top: the shadow line in the photo. */}
+      <RoundedBox
+        args={[8.9, 0.28, 8.9]}
+        radius={0.05}
+        smoothness={2}
+        position={[0, -0.62, 0]}
+        castShadow
+        receiveShadow
+      >
+        <primitive object={edge} attach="material" />
+      </RoundedBox>
+
+      {legs.map(([lx, lz]) => (
+        <RoundedBox
+          key={`leg-${lx}-${lz}`}
+          args={[0.75, 5.4, 0.75]}
+          radius={0.03}
+          smoothness={2}
+          position={[lx, -3.4, lz]}
+          castShadow
+          receiveShadow
+        >
+          <primitive object={edge} attach="material" />
+        </RoundedBox>
+      ))}
+    </group>
+  );
+}
+
 function Scene({
   sim,
   onMatch,
@@ -250,6 +325,8 @@ function Scene({
   const placementCount = useRef(0);
   /** Set once the crash has sounded, so it is not retriggered every frame. */
   const crashPlayed = useRef(false);
+  /** Per-plank landing state, so each plank knocks on the table exactly once. */
+  const railState = useRef(new Map<number, { high: boolean; landed: boolean }>());
   const beginPlacement = () => {
     placementCount.current += 1;
     const layer = sim.topLayer() + 1;
@@ -367,20 +444,23 @@ function Scene({
       mesh.quaternion.set(t.qx, t.qy, t.qz, t.qw);
     }
 
-    // Any plank that has dropped out of its layer counts: one or two coming off the top
-    // should be heard, even though only a real collapse ends the match.
-    if (!crashPlayed.current && !sim.pulling && match.current.phase !== "over") {
-      const heights = new Map(transforms.map((tr) => [tr.id, tr.y]));
-      for (const plank of sim.planks) {
-        if (plank.removed) continue;
-        const y = heights.get(plank.id);
-        if (y === undefined) continue;
-        const nominal = PLANK.h / 2 + plank.layer * PLANK.h;
-        if (y < nominal - 0.12) {
-          crashPlayed.current = true;
-          stackAudio.collapse();
-          break;
+    // Each plank that reaches the table gets its own knock. The table top is at y = 0,
+    // so a plank lying on it sits at half its height; anything from higher up that drops
+    // to that level has landed.
+    {
+      const restingY = PLANK.h / 2 + 0.05;
+      let landings = 0;
+      for (const tr of transforms) {
+        const state = railState.current.get(tr.id) ?? { high: false, landed: false };
+        if (!state.landed) {
+          if (tr.y > PLANK.h * 2) state.high = true;
+          if (state.high && tr.y <= restingY) {
+            state.landed = true;
+            stackAudio.groundHit(landings);
+            landings += 1;
+          }
         }
+        railState.current.set(tr.id, state);
       }
     }
 
@@ -485,6 +565,8 @@ function Scene({
   useEffect(() => {
     (window as unknown as { __game?: typeof debug.current }).__game = debug.current;
     (window as unknown as { __stackSound?: () => unknown }).__stackSound = () => stackAudio.report;
+    (window as unknown as { __planks?: () => unknown }).__planks = () =>
+      sim.transforms().map((tr) => ({ id: tr.id, y: Number(tr.y.toFixed(2)) }));
     (window as unknown as { __stackPlay?: (k: string) => void }).__stackPlay = (k) => {
       if (k === "pull") stackAudio.pull();
       if (k === "place") stackAudio.place(4);
@@ -579,7 +661,7 @@ export function StackTowerGame() {
   }, [load]);
 
   const camera = useMemo(
-    () => ({ position: [13, 11, 13] as [number, number, number], fov: 42 }),
+    () => ({ position: [17, 11.5, 17] as [number, number, number], fov: 42 }),
     [],
   );
 
@@ -613,13 +695,20 @@ export function StackTowerGame() {
 
           <Scene sim={sim} onMatch={setMatch} onCarry={setCarryUi} />
 
-          {/* Studio floor: dark, with the tower's contact shadow. */}
-          <mesh position={[0, -0.26, 0]} receiveShadow>
-            <boxGeometry args={[40, 0.5, 40]} />
-            <meshStandardMaterial color="#0d0d10" roughness={0.92} metalness={0.05} />
+          {/* Table the tower stands on. Its top face sits at y = 0, which is where the
+              physics ground is, so a plank resting on it looks like it is resting on
+              the table rather than floating on nothing. Modelled on the reference photo:
+              a thick top with a rounded edge, a darker band under it, and four square
+              legs set in from the corners. */}
+          <TableUnderTower />
+
+          {/* Room floor, well below the table. */}
+          <mesh position={[0, -6.2, 0]} receiveShadow>
+            <boxGeometry args={[60, 0.4, 60]} />
+            <meshStandardMaterial color="#0b0b0e" roughness={0.95} metalness={0.04} />
           </mesh>
           <ContactShadows
-            position={[0, 0.01, 0]}
+            position={[0, 0.012, 0]}
             opacity={0.55}
             scale={22}
             blur={2.6}
@@ -629,7 +718,7 @@ export function StackTowerGame() {
           />
 
           <OrbitControls
-            target={[0, (LAYERS * PLANK.h) / 2 + 1.2, 0]}
+            target={[0, 4.9, 0]}
             enablePan={false}
             minDistance={9}
             maxDistance={30}

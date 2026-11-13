@@ -23,7 +23,7 @@ export class StackAudio {
   }
 
   /** Diagnostic: how often each of the three events has sounded. */
-  private plays = { pull: 0, place: 0, collapse: 0 };
+  private plays = { pull: 0, place: 0, collapse: 0, ground: 0 };
   get report(): {
     state: string;
     plays: typeof this.plays;
@@ -297,6 +297,37 @@ export class StackAudio {
     }
 
     const pitch = 0.95 + Math.min(12, layer) * 0.02;
+    this.knock(at, pitch, 0.34);
+  }
+
+  /**
+   * One plank hitting the table. Each falling plank gets its own, so a group coming
+   * down is heard as a cascade rather than as a single crash.
+   */
+  groundHit(index = 0): void {
+    if (!this.ctx) return;
+    this.plays.ground += 1;
+    // Slight schedule offset so simultaneous landings do not phase-cancel.
+    const at = this.ctx.currentTime + Math.min(0.12, index * 0.018);
+    const pitch = 0.88 + Math.random() * 0.28;
+
+    if (this.placeBuffer) {
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.placeBuffer;
+      source.playbackRate.value = pitch;
+
+      const envelope = this.ctx.createGain();
+      envelope.gain.setValueAtTime(0.95, at);
+      envelope.gain.setValueAtTime(0.95, at + 0.22);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.42);
+
+      source.connect(envelope);
+      envelope.connect(this.master!);
+      source.start(at, this.placeOnset);
+      source.stop(at + 0.44);
+      return;
+    }
+
     this.knock(at, pitch, 0.34);
   }
 
