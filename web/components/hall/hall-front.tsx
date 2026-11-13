@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
@@ -372,7 +371,6 @@ function Rig({
 }
 
 export function HallFront() {
-  const router = useRouter();
   const [entered, setEntered] = useState(false);
   const [flying, setFlying] = useState<Station | null>(null);
 
@@ -441,7 +439,7 @@ export function HallFront() {
           flying={flying}
           entered={entered}
           onArrived={() => {
-            if (flying) router.push(href(flying.route));
+            if (flying) window.location.assign(href(flying.route));
           }}
         />
       </Canvas>

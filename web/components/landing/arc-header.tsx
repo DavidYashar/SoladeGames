@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import { SoladeWordmark, RobotMark } from "@/components/brand/arcade-logo";
+import { AppLink } from "@/components/ui/app-link";
 import { href } from "@/lib/href";
 import { ConnectWallet } from "@/components/connect-wallet";
 
@@ -29,19 +29,19 @@ export function ArcHeader() {
   return (
     <header className="sticky top-0 z-40 bg-black/85 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
-        <Link href="/" className="flex items-center gap-2.5" aria-label="SolAde Games home">
+        <AppLink to={href("/")} className="flex items-center gap-2.5" ariaLabel="SolAde Games home">
           <SoladeWordmark className="h-5 w-auto text-white sm:h-[22px]" />
-        </Link>
+        </AppLink>
 
         <nav className="hidden items-center gap-6 md:flex">
           {NAV.map((n) => (
-            <Link
+            <AppLink
               key={n.label}
-              href={href(n.href)}
+              to={href(n.href)}
               className="arcade-underline font-display relative py-1 text-[11px] uppercase tracking-[0.14em] text-zinc-400 transition-colors hover:text-white"
             >
               {n.label}
-            </Link>
+            </AppLink>
           ))}
         </nav>
 
@@ -103,14 +103,14 @@ export function ArcHeader() {
       >
         <nav className="mx-auto flex w-full max-w-6xl flex-col items-center gap-1 px-6 py-4 text-center">
           {NAV.map((n) => (
-            <Link
+            <AppLink
               key={n.label}
-              href={href(n.href)}
+              to={href(n.href)}
               onClick={() => setOpen(false)}
               className="font-display w-full max-w-xs rounded-sm px-6 py-3 text-[11px] uppercase tracking-[0.16em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               {n.label}
-            </Link>
+            </AppLink>
           ))}
           {DEMO ? null : (
             <span className="mt-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">

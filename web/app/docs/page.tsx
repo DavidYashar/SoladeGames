@@ -1,7 +1,7 @@
-import Link from "next/link";
 
 import { ArcHeader } from "@/components/landing/arc-header";
 import { Footer } from "@/components/landing/footer";
+import { AppLink } from "@/components/ui/app-link";
 import { href } from "@/lib/href";
 
 const GAMES = [
@@ -80,24 +80,24 @@ export default function DocsPage() {
           <ul className="space-y-4">
             {GAMES.map((game) => (
               <li key={game.name}>
-                <Link
-                  href={href(game.route)}
+                <AppLink
+                  to={href(game.route)}
                   className="font-semibold text-zinc-100 underline-offset-4 hover:text-[#ffb066] hover:underline"
                 >
                   {game.name}
-                </Link>
+                </AppLink>
                 <p className="mt-1">{game.desc}</p>
               </li>
             ))}
           </ul>
           <p>
             A daily puzzle sits at{" "}
-            <Link
-              href={href("/play")}
+            <AppLink
+              to={href("/play")}
               className="text-zinc-200 underline decoration-[#7a4a2c] underline-offset-4 hover:text-[#ffb066]"
             >
               /play
-            </Link>
+            </AppLink>
             . It is gated behind a player handle, so it is not playable for a first-time
             visitor.
           </p>
