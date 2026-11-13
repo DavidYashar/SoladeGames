@@ -7,11 +7,11 @@ export function Footer() {
         <div className="text-center sm:text-left">
           <p className="font-black tracking-tight">
             <span className="bg-gradient-to-r from-[#8fc0e8] to-[#5b9fd8] bg-clip-text text-transparent">
-              ARC-ADE
+              SolAde Games
             </span>
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Play · Compete · Own the hall — settled in USDC on Arc.
+            Three skill games in a hall. Free to play on Solana devnet.
           </p>
         </div>
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-zinc-500">
@@ -32,8 +32,8 @@ export function Footer() {
           </Link>
         </nav>
         <div className="text-center text-xs text-zinc-600 sm:text-right">
-          <p>Chain ID 5042002 · rpc.testnet.arc.io</p>
-          <p className="mt-1">Testnet build — on-chain rewards go live with mainnet.</p>
+          <p>Solana devnet · free play only</p>
+          <p className="mt-1">No payments are taken. Settlement is not implemented.</p>
         </div>
       </div>
     </footer>

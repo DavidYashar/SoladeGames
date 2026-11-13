@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ArcadeWordmark, RobotMark } from "@/components/brand/arcade-logo";
+import { SoladeWordmark, RobotMark } from "@/components/brand/arcade-logo";
 
 /** 404 — the robot lost the cabinet. */
 export default function NotFound() {
@@ -39,9 +39,8 @@ export default function NotFound() {
         </Link>
       </div>
 
-      <ArcadeWordmark
+      <SoladeWordmark
         className="mt-16 h-4 w-auto text-white/20"
-        gradientId="arcade-wordmark-404"
       />
     </main>
   );

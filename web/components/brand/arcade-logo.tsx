@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 /* ------------------------------------------------------------------ *
- * ARC_ADE brand marks.
+ * SolAde Games brand marks.
  *
  * Both pieces are pure inline SVG with no background fill, so they sit
  * transparently on black chrome, on the steel-blue machines, or on
@@ -65,6 +65,39 @@ const GLYPHS: Record<string, readonly string[]> = {
     "1100000",
     "1111110",
     "1111110",
+    "1100000",
+    "1111111",
+    "1111111",
+  ],
+  S: [
+    "0111111",
+    "1111111",
+    "1100000",
+    "1100000",
+    "0111110",
+    "0000011",
+    "0000011",
+    "1111111",
+    "0111111",
+  ],
+  O: [
+    "0011100",
+    "0111110",
+    "1110111",
+    "1100011",
+    "1100011",
+    "1100011",
+    "1110111",
+    "0111110",
+    "0011100",
+  ],
+  L: [
+    "1100000",
+    "1100000",
+    "1100000",
+    "1100000",
+    "1100000",
+    "1100000",
     "1100000",
     "1111111",
     "1111111",
@@ -161,70 +194,36 @@ export function RobotMark({
 
 /* ------------------------------------------------------------------ */
 
-const WORDMARK_UNITS = 64;
+const WORDMARK_UNITS = 52;
 
 /**
- * "ARC_ADE" wordmark where the second A is the robot.
- * Renders at any height via the `className` (e.g. `h-6 w-auto`).
+ * "SOLADE" wordmark. A real A, not the robot: at header size the robot's pentagon
+ * reads as a blob, and the word has to be legible first. The robot survives as its
+ * own mark (RobotMark) wherever there is room for a face.
  */
-export function ArcadeWordmark({
+export function SoladeWordmark({
   className,
-  title = "ARC_ADE",
-  gradientId = "arcade-wordmark-gradient",
+  title = "SOLADE",
 }: {
   className?: string;
   title?: string;
-  /** Change when two wordmarks of different colours share a page. */
-  gradientId?: string;
 }) {
   return (
     <svg
-      viewBox={`0 0 ${WORDMARK_UNITS} 9`}
+      viewBox="0 0 52 9"
       className={className}
       shapeRendering="crispEdges"
       role="img"
       aria-label={title}
     >
       <title>{title}</title>
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--arcade-cyan)" />
-          <stop offset="100%" stopColor="var(--arcade-violet)" />
-        </linearGradient>
-      </defs>
 
-      {/* A R C */}
-      {glyphRects("A", 0, 0)}
-      {glyphRects("R", 9, 0)}
-      {glyphRects("C", 18, 0)}
-
-      {/* gradient underscore */}
-      <rect
-        x="28"
-        y="6.6"
-        width="9"
-        height="2.2"
-        fill={`url(#${gradientId})`}
-      />
-
-      {/* robot A (the second A of the wordmark) */}
-      <g transform="translate(39 0)">
-        <rect x="3.2" y="0" width="0.6" height="1.3" fill="currentColor" />
-        <path d="M3.5 1.15 L6.6 2.75 V8.85 H0.4 V2.75 Z" fill="currentColor" />
-        <rect
-          x="1.2"
-          y="3.7"
-          width="4.6"
-          height="3.8"
-          fill="var(--arcade-ink)"
-        />
-        <rect x="1.95" y="4.7" width="1.05" height="1.5" fill="var(--arcade-cyan)" />
-        <rect x="4" y="4.7" width="1.05" height="1.5" fill="var(--arcade-cyan)" />
-      </g>
-
-      {/* D E */}
-      {glyphRects("D", 48, 0)}
-      {glyphRects("E", 57, 0)}
+      {glyphRects("S", 0, 0)}
+      {glyphRects("O", 9, 0)}
+      {glyphRects("L", 18, 0)}
+      {glyphRects("A", 27, 0)}
+      {glyphRects("D", 36, 0)}
+      {glyphRects("E", 45, 0)}
     </svg>
   );
 }

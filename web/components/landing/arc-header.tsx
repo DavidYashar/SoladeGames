@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { ArcadeWordmark, RobotMark } from "@/components/brand/arcade-logo";
+import { SoladeWordmark, RobotMark } from "@/components/brand/arcade-logo";
 import { ConnectWallet } from "@/components/connect-wallet";
 
 /** Sticky top bar: brand, nav, live chain badge, wallet — with a mobile hamburger menu. */
 const NAV = [
-  { href: "#machines", label: "Machines" },
-  { href: "#tournament", label: "Tonight" },
+  { href: "/#machines", label: "Machines" },
+  { href: "/#tournament", label: "Tonight" },
   { href: "/play", label: "Puzzle" },
-  { href: "#nft", label: "Own" },
-  { href: "#roadmap", label: "Plan" },
+  { href: "/#own", label: "Own" },
+  { href: "/#plan", label: "Plan" },
   { href: "/docs", label: "Docs" },
 ] as const;
 
@@ -23,7 +23,7 @@ export function ArcHeader() {
     <header className="sticky top-0 z-40 bg-black/85 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
         <Link href="/" className="flex items-center gap-2.5" aria-label="ARC_ADE home">
-          <ArcadeWordmark className="h-5 w-auto text-white sm:h-[22px]" />
+          <SoladeWordmark className="h-5 w-auto text-white sm:h-[22px]" />
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">

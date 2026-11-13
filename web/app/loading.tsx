@@ -1,10 +1,10 @@
-import { ArcadeWordmark } from "@/components/brand/arcade-logo";
+import { SoladeWordmark } from "@/components/brand/arcade-logo";
 
 /** Boot screen — shown while a route streams in. */
 export default function Loading() {
   return (
     <main className="flex min-h-dvh flex-1 flex-col items-center justify-center bg-[#0a0705] px-6 text-white">
-      <ArcadeWordmark className="h-6 w-auto text-[#ffb066]" />
+      <SoladeWordmark className="h-6 w-auto text-[#ffb066]" />
 
       <div
         aria-hidden

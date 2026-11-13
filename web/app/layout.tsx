@@ -6,7 +6,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
 
 /*
- * Arcade type system (locked with the ARC_ADE logo):
+ * Arcade type system (locked with the SOLADE wordmark):
  *   heading → Press Start 2P   chunky 8-bit block letters, like the wordmark
  *   display → Silkscreen       bitmap labels, nav, buttons, HUD numerals
  *   sans    → Chakra Petch     squarish technical body copy

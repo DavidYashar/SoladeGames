@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ArcadeWordmark, RobotMark } from "@/components/brand/arcade-logo";
+import { SoladeWordmark, RobotMark } from "@/components/brand/arcade-logo";
 import { DailyPuzzle } from "@/components/daily-puzzle";
 import { CabinetMarquee } from "@/components/games/cabinet-marquee";
 import { RequireAccount } from "@/components/require-account";
@@ -63,9 +63,8 @@ export default function PlayPage() {
 
         <div className="flex items-center justify-center gap-2 pb-2 pt-2 opacity-40">
           <RobotMark className="h-4 w-auto text-white" />
-          <ArcadeWordmark
+          <SoladeWordmark
             className="h-3 w-auto text-white"
-            gradientId="arcade-wordmark-play"
           />
         </div>
       </main>
