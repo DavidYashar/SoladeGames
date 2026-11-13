@@ -11,8 +11,11 @@ export type BrickKind = "clay" | "stone" | "glass" | "keg" | "gold" | "iron";
 export class BrickAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
-  private lastHitAt = 0;
   private lastBrickAt = 0;
+  /** When each material last sounded, so one material cannot silence another. */
+  private lastKindAt: Partial<Record<BrickKind, number>> = {};
+  /** Starts in the last 30 ms, so a burst cannot swamp the output. */
+  private recentStarts: number[] = [];
   private rollGain: GainNode | null = null;
   private rollFilter: BiquadFilterNode | null = null;
   private rollLevel = 0;
@@ -308,8 +311,17 @@ export class BrickAudio {
   brick(kind: BrickKind, breaking: boolean): void {
     if (!this.ctx) return;
     const now = performance.now();
-    if (now - this.lastHitAt < 22) return;
-    this.lastHitAt = now;
+
+    // Only the SAME material is throttled. A blanket limiter dropped real hits when the
+    // ball crossed several bricks inside one frame, which is exactly what happens at
+    // speed — and iron and glass were the ones being lost.
+    // No per-material throttle: a wall of the same brick should rattle. The only guard
+    // is a ceiling on how many sounds may start at once.
+    this.recentStarts = this.recentStarts.filter((startedAt) => now - startedAt < 30);
+    if (this.recentStarts.length >= 6) return;
+
+    this.lastKindAt[kind] = now;
+    this.recentStarts.push(now);
     this.lastBrickAt = now;
 
     const at = this.ctx.currentTime;

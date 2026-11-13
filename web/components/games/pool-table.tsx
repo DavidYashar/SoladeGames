@@ -952,6 +952,10 @@ export function PoolTable() {
       const brick = current.find((b) => b.id === id);
       if (!brick) return;
 
+      const w = window as unknown as { __hits?: Record<string, number> };
+      w.__hits = w.__hits ?? {};
+      w.__hits[brick.kind] = (w.__hits[brick.kind] ?? 0) + 1;
+
       if (brick.hp > 1) {
         brickAudio.brick(brick.kind, false);
         commit(current.map((b) => (b.id === id ? { ...b, hp: b.hp - 1 } : b)));
