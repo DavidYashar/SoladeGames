@@ -9,6 +9,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 
 import { makeWoodTextures } from "@/lib/jenga/wood";
 import WALLS from "@/lib/pinball/table-walls.json";
+import { audio } from "@/lib/pinball/audio";
 
 /**
  * Neon Pinball.
@@ -787,6 +788,7 @@ function Pinball({
   const stalled = useRef(0);
   const slingCooldown = useRef<Record<number, number>>({});
   const arrowCooldown = useRef<Record<number, number>>({});
+  const lastVel = useRef({ x: 0, z: 0 });
   const [ready, setReady] = useState(false);
   const cleanups = useRef<(() => void)[]>([]);
   const mode = useRef<"idle" | "play">("idle");
@@ -1082,6 +1084,8 @@ function Pinball({
           // Freed world; ignore.
         }
       };
+      (window as unknown as { __audioState?: () => string }).__audioState = () => audio.state;
+
       (window as unknown as { __pin?: () => unknown }).__pin = () => {
         if (!liveBall.current || !world.current) return { x: 0, y: 0, z: 0, vx: 0, vz: 0, charge: 0, mode: "idle", held: false, slingKicks: 0, bumperKicks: 0 };
         const ball = liveBall.current;
@@ -1108,15 +1112,20 @@ function Pinball({
 
       // Keyboard: Space charges the plunger, arrows/A-D work the flippers.
       const down = (e: KeyboardEvent) => {
+        // The first key press is also what lets the browser start audio.
+        void audio.unlock();
+
         if (e.code === "Space") {
           e.preventDefault();
           if (mode.current === "idle") shared.plungerHeld = true;
           return;
         }
         if (e.code === "ArrowLeft" || e.code === "KeyA") {
+          if (flip.current.leftTarget === FLIP_REST) audio.flipper();
           flip.current.leftTarget = FLIP_REST + FLIP_SWING;
         }
         if (e.code === "ArrowRight" || e.code === "KeyD") {
+          if (flip.current.rightTarget === -FLIP_REST) audio.flipper();
           flip.current.rightTarget = -FLIP_REST - FLIP_SWING;
         }
       };
@@ -1130,6 +1139,7 @@ function Pinball({
             ((window as unknown as { __fires?: number }).__fires ?? 0) + 1;
           // Charge 0..1 maps onto 1.6..5.4 m/s.
           const speed = 1.4 + shared.charge * 2.9;
+          audio.plunge(shared.charge);
           ball.setLinvel({ x: -speed, y: 0, z: 0 }, true);
           (window as unknown as { __fireVel?: unknown }).__fireVel = ball.linvel();
           shared.charge = 0;
@@ -1192,6 +1202,21 @@ function Pinball({
     const w = world.current;
     const ball = liveBall.current;
     if (!w || !ball) return;
+
+    // The ball is audible: a rolling bed that follows its speed, and an impact
+    // whenever its velocity changes sharply (a wall, a post, a flipper).
+    {
+      const v = ball.linvel();
+      const speedNow = Math.hypot(v.x, v.z);
+      audio.roll(speedNow);
+
+      const prev = lastVel.current;
+      const dv = Math.hypot(v.x - prev.x, v.z - prev.z);
+      lastVel.current = { x: v.x, z: v.z };
+      if (mode.current === "play" && dv > 0.9) {
+        audio.impact(Math.min(1, dv / 5));
+      }
+    }
 
     if (shared.combo > 0 && performance.now() - shared.comboAt > 2600) {
       shared.combo = 0;
@@ -1341,9 +1366,11 @@ function Pinball({
         bumperCooldown.current[index] = now + 200;
 
         shared.flash[index] = now;
+        audio.bell(index);
         shared.combo = Math.min(6, shared.combo + 1);
         shared.comboAt = now;
         shared.onCombo?.(shared.combo);
+        audio.chain(shared.combo);
 
         const value = b.value * (1 + shared.combo);
         shared.score += value;
@@ -1397,6 +1424,7 @@ function Pinball({
         shared.score += 25;
         shared.onScore?.(shared.score);
         shared.slingFlash[side] = now;
+        audio.impact(1);
 
         ball.setTranslation(
           { x: t.x, y: PLAY.y + 0.025, z: plate.z + inward * 0.06 },
@@ -1413,6 +1441,7 @@ function Pinball({
         if (now < (arrowCooldown.current[arrow.side] ?? 0)) continue;
         arrowCooldown.current[arrow.side] = now + 300;
 
+        audio.chevron(arrow.side);
         ball.setLinvel({ x: -0.55, y: 0.12, z: arrow.side * 2.8 }, true);
       }
     }
@@ -1477,6 +1506,7 @@ function Pinball({
     // Drained: past the flippers into the field, or under the playfield.
     if (mode.current === "play") {
       if (t.y < PLAY.y - 0.08 || (t.x > 0.45 && t.z > DIVIDER_Z + 0.012)) {
+        audio.drain();
         mode.current = "idle";
         shared.charge = 0;
         onCharge(0);
