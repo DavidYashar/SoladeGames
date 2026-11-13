@@ -212,25 +212,9 @@ export function HallFront() {
         {/* One pendant over each machine, and the light comes from those bulbs. A low
             ambient keeps the far corners from going black without inventing a source. */}
         <ambientLight intensity={0.34} color="#ffe0c6" />
-        {[
-          [-6.4, 3.2],
-          [0, 1.4],
-          [6.2, 3.2],
-        ].map(([x, z], i) => (
-          <group key={`lamp-${i}`}>
-            <spotLight
-              position={[x, 3.3, z]}
-              angle={0.85}
-              penumbra={0.75}
-              intensity={110}
-              color="#ffd9a6"
-              distance={14}
-              decay={2}
-              target-position={[x, 0.9, z]}
-            />
-            <pointLight position={[x, 3.2, z]} intensity={6} color="#ffd9a6" distance={4} decay={2} />
-          </group>
-        ))}
+        <Lamp at={[-6.4, 3.3, 3.2]} aim={[-6.4, 0.9, 3.2]} intensity={110} />
+        <Lamp at={[0, 3.3, 1.4]} aim={[0, 0.9, 1.4]} intensity={110} />
+        <Lamp at={[6.2, 3.3, 3.2]} aim={[6.2, 0.9, 3.2]} intensity={110} />
 
         {/* The lit strips under the back-bar shelves, as light rather than decoration. */}
         <pointLight position={[-2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7.5} decay={2} />
@@ -296,6 +280,34 @@ export function HallFront() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** One pendant bulb: a spot that actually aims at its own table. */
+function Lamp({
+  at,
+  aim,
+  intensity,
+}: {
+  at: [number, number, number];
+  aim: [number, number, number];
+  intensity: number;
+}) {
+  const { spot, target } = useMemo(() => {
+    const target = new THREE.Object3D();
+    target.position.set(...aim);
+    const spot = new THREE.SpotLight("#ffd9a6", intensity, 15, 0.82, 0.7, 2);
+    // A spotlight only aims where its target sits, and that target must be in the scene.
+    spot.target = target;
+    return { spot, target };
+  }, [aim, intensity]);
+
+  return (
+    <>
+      <primitive object={spot} position={at} />
+      <primitive object={target} />
+      <pointLight position={at} intensity={7} color="#ffd9a6" distance={4.5} decay={2} />
+    </>
   );
 }
 
