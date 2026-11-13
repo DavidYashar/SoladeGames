@@ -141,37 +141,39 @@ function Plank({
   );
 }
 
-/** The table: the photographed surface on a thick slab, four legs under it. */
+/** The table: built from the photographed wood, top and legs alike. */
 function TableUnderTower() {
-  const grain = useMemo(() => makeWoodTextures(), []);
-
-  // The photographed top. Repeat is left at 1:1 so the grain runs across the whole
-  // surface rather than tiling visibly.
   const surface = useTexture("/textures/table-wood.png");
   surface.colorSpace = THREE.SRGBColorSpace;
   surface.anisotropy = 8;
+
+  // The same board, stretched down the legs so the grain runs along them.
+  const legMap = useMemo(() => {
+    const map = surface.clone();
+    map.needsUpdate = true;
+    map.repeat.set(1, 2.6);
+    map.offset.set(0, 0.1);
+    return map;
+  }, [surface]);
 
   const top = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
         map: surface,
-        color: "#ffffff",
-        roughness: 0.46,
+        roughness: 0.45,
         metalness: 0.02,
-        emissive: new THREE.Color("#2a1a10"),
-        emissiveIntensity: 0.25,
       }),
     [surface],
   );
-  const edge = useMemo(
+  const timber = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        map: grain.map,
-        color: "#7a5230",
-        roughness: 0.68,
+        map: legMap,
+        color: "#c9a17a",
+        roughness: 0.62,
         metalness: 0.02,
       }),
-    [grain],
+    [legMap],
   );
 
   const legs: [number, number][] = [
@@ -183,55 +185,24 @@ function TableUnderTower() {
 
   return (
     <group>
-      {/* Top slab: twice the depth it had, upper face still flush with y = 0. */}
-      <RoundedBox
-        args={[8.6, 1.0, 8.6]}
-        radius={0.06}
-        smoothness={3}
-        position={[0, -0.5, 0]}
-        castShadow
-        receiveShadow
-      >
+      {/* Top slab: a box, not a rounded box, because a box maps the board across each
+          face properly. Upper face flush with y = 0. */}
+      <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
+        <boxGeometry args={[8.6, 1.0, 8.6]} />
         <primitive object={top} attach="material" />
-      </RoundedBox>
+      </mesh>
 
-      {/* Band under the top, also doubled. */}
-      <RoundedBox
-        args={[8.95, 0.55, 8.95]}
-        radius={0.05}
-        smoothness={2}
-        position={[0, -1.25, 0]}
-        castShadow
-        receiveShadow
-      >
-        <primitive object={edge} attach="material" />
-      </RoundedBox>
-
-      {/* The photographed top, laid flat over the slab: a plane maps the image edge to
-          edge, which a rounded box does not. */}
-      <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[8.6, 8.6]} />
-        <meshStandardMaterial
-          map={surface}
-          roughness={0.45}
-          metalness={0.02}
-          emissive={new THREE.Color("#2a1a10")}
-          emissiveIntensity={0.3}
-        />
+      {/* Band under the top. */}
+      <mesh position={[0, -1.25, 0]} castShadow receiveShadow>
+        <boxGeometry args={[8.95, 0.55, 8.95]} />
+        <primitive object={timber} attach="material" />
       </mesh>
 
       {legs.map(([lx, lz]) => (
-        <RoundedBox
-          key={`leg-${lx}-${lz}`}
-          args={[0.85, 5.2, 0.85]}
-          radius={0.03}
-          smoothness={2}
-          position={[lx, -4.1, lz]}
-          castShadow
-          receiveShadow
-        >
-          <primitive object={edge} attach="material" />
-        </RoundedBox>
+        <mesh key={`leg-${lx}-${lz}`} position={[lx, -4.1, lz]} castShadow receiveShadow>
+          <boxGeometry args={[0.85, 5.2, 0.85]} />
+          <primitive object={timber} attach="material" />
+        </mesh>
       ))}
     </group>
   );
