@@ -91,7 +91,7 @@ export default function DocsPage() {
             <li>
               <span className="font-semibold text-zinc-200">Practice free.</span>{" "}
               Every machine runs a daily-seeded board that is identical for all
-              players, so it's always about skill.
+              players, so it&apos;s always about skill.
             </li>
             <li>
               <span className="font-semibold text-zinc-200">Earn season points.</span>{" "}
@@ -107,7 +107,7 @@ export default function DocsPage() {
             </li>
             <li>
               <span className="font-semibold text-zinc-200">Own a machine.</span>{" "}
-              Your NFT is one of four machine types tied to a game. It's an
+              Your NFT is one of four machine types tied to a game. It&apos;s an
               identity and revenue-share asset — not a way to buy your way to the
               top of a leaderboard.
             </li>
@@ -176,7 +176,7 @@ export default function DocsPage() {
 
         <Section kicker="Own" title="Machine NFTs">
           <p>
-            Each machine NFT is a claim on real play — you earn it, you don't buy it.
+            Each machine NFT is a claim on real play — you earn it, you don&apos;t buy it.
             Holders receive a share of eligible game revenue because the hall is in
             use, not because a token inflated.
           </p>
@@ -209,7 +209,7 @@ export default function DocsPage() {
           <ol className="list-decimal space-y-2 pl-5">
             <li>Connect your wallet (header, top right).</li>
             <li>Pick a machine and practice free.</li>
-            <li>Fund USDC and compete when you're ready.</li>
+            <li>Fund USDC and compete when you&apos;re ready.</li>
             <li>Track your stats on your profile page.</li>
           </ol>
         </Section>

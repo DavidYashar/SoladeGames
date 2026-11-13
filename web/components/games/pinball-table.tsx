@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import Link from "next/link";
+
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { RoundedBox, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -1034,6 +1036,7 @@ function Pinball({
             y: Number(tr.y.toFixed(3)),
             z: Number(tr.z.toFixed(3)),
           });
+          return true;
         });
         return hits;
       };
@@ -1249,8 +1252,8 @@ function Pinball({
     };
     f.left = step(f.left, f.leftTarget);
     f.right = step(f.right, f.rightTarget);
-    leftBody.current?.setNextKinematicRotation(quatFromY(f.left), true);
-    rightBody.current?.setNextKinematicRotation(quatFromY(f.right), true);
+    leftBody.current?.setNextKinematicRotation(quatFromY(f.left));
+    rightBody.current?.setNextKinematicRotation(quatFromY(f.right));
 
     if (leftFlip.current) leftFlip.current.rotation.y = f.left;
     if (rightFlip.current) rightFlip.current.rotation.y = f.right;
@@ -1758,13 +1761,13 @@ export function PinballTable() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
         <div className="flex items-start justify-between">
           <div>
-            <a
+            <Link
               href="/"
               aria-label="Back to the hall"
               className="pointer-events-auto mb-3 inline-flex items-center gap-1.5 font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none"
             >
               <span aria-hidden="true">&larr;</span> Hall
-            </a>
+            </Link>
             <p className="font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500">Score</p>
             <p className="font-display text-2xl tabular-nums text-zinc-100">{score}</p>
           </div>

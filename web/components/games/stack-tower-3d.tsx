@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import Link from "next/link";
+
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { ContactShadows, OrbitControls, RoundedBox, useTexture } from "@react-three/drei";
 import * as THREE from "three";
@@ -747,12 +749,12 @@ export function StackTowerGame() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-4 sm:p-6">
         <div className="flex items-start justify-between">
           <div>
-            <a
+            <Link
               href="/"
               className="pointer-events-auto font-display text-[10px] uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-white"
             >
               ← Hall
-            </a>
+            </Link>
             <p className="font-display mt-3 text-[10px] uppercase tracking-[0.16em] text-zinc-600">
               You
             </p>

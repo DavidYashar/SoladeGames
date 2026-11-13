@@ -24,7 +24,7 @@ export function getDailySequence(dateKey: string): SequenceResult {
   let terms: number[] = [];
   let answer = 0;
   let hint = "";
-  let ruleName = rule;
+  const ruleName = rule;
 
   switch (rule) {
     case "arithmetic": {

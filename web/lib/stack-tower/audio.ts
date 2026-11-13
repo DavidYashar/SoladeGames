@@ -6,6 +6,8 @@
  * short resonant modes rather than a noise wash, because wood is a struck body.
  */
 
+export type Plays = { pull: number; place: number; collapse: number; ground: number };
+
 export class StackAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -23,10 +25,10 @@ export class StackAudio {
   }
 
   /** Diagnostic: how often each of the three events has sounded. */
-  private plays = { pull: 0, place: 0, collapse: 0, ground: 0 };
+  private plays: Plays = { pull: 0, place: 0, collapse: 0, ground: 0 };
   get report(): {
     state: string;
-    plays: typeof this.plays;
+    plays: Plays;
     loaded: { pull: boolean; place: boolean; collapse: boolean };
     collapse: { onset: number; duration: number; seconds: number } | null;
   } {
