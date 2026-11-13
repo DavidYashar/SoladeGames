@@ -147,7 +147,29 @@ by code in this repository.
 
 ---
 
-## 9. How the code is organised
+## 9. The demo build
+
+For a colleague to try without a server, database or wallet:
+
+```bash
+cd web
+npm run build:demo     # writes web/out/
+```
+
+`out/` is a folder of static files: open it behind any static host, or
+`npx serve out` locally. It contains the entrance, the hall and the three games, with
+their models, textures and audio. No API routes are built, so nothing can 404.
+
+How it works: `DEMO_STATIC=1` switches `next.config.ts` to `output: "export"` and sets
+`pageExtensions: ["tsx"]`, which drops the six `route.ts` handlers, the only `.ts` files
+under `app/`. The real app is unchanged.
+
+On Render, a static site with root `web`, build `npm ci && npm run build:demo` and
+publish path `out` produces the same thing. `render.yaml` has it pre-filled.
+
+---
+
+## 10. How the code is organised
 
 ```
 web/                    Next.js 16 app (React 19, Tailwind 4)
@@ -177,7 +199,7 @@ needs Postgres.
 
 ---
 
-## 10. Status
+## 11. Status
 
 | Area | State |
 |---|---|

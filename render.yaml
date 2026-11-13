@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: solade-demo
+    runtime: static
+    repo: https://github.com/DavidYashar/SoladeGames
+    branch: main
+    rootDir: web
+    buildCommand: npm ci && npm run build:demo
+    staticPublishPath: ./out
+    envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
