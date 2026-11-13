@@ -199,15 +199,16 @@ def build_lamps(parts):
     shades = []
     bulbs = []
     cords = []
-    for i, x in enumerate((-3.6, 0.0, 3.6)):
+    # One pendant over each machine: pinball, pool table, jenga table.
+    for i, (x, y) in enumerate(((-6.4, -3.2), (0.0, -1.4), (6.2, -3.2))):
         bpy.ops.mesh.primitive_cone_add(
-            vertices=28, radius1=0.52, radius2=0.16, depth=0.4, location=(x, -4.4, 3.55)
+            vertices=28, radius1=0.52, radius2=0.16, depth=0.4, location=(x, y, 3.55)
         )
         cone = bpy.context.active_object
         cone.name = f"Shade{i}"
         shades.append(cone)
-        bulbs.append(cyl(f"Bulb{i}", 0.14, 0.12, (x, -4.4, 3.34), vertices=14))
-        cords.append(box(f"Cord{i}", (0.03, 0.03, 1.35), (x, -4.4, 4.5)))
+        bulbs.append(cyl(f"Bulb{i}", 0.14, 0.12, (x, y, 3.34), vertices=14))
+        cords.append(box(f"Cord{i}", (0.03, 0.03, 1.35), (x, y, 4.5)))
     parts.append(join(shades, "LampShades"))
     parts.append(join(bulbs, "LampBulbs"))
     parts.append(join(cords, "LampCords"))

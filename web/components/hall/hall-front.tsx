@@ -81,8 +81,13 @@ function Hall() {
     const barWood = new THREE.MeshStandardMaterial({ map: grain, color: "#a06c3c", roughness: 0.5, metalness: 0.05 });
     const brass = new THREE.MeshStandardMaterial({ color: "#c9a24c", roughness: 0.3, metalness: 0.95 });
     const bottle = new THREE.MeshPhysicalMaterial({ color: "#2a3a22", roughness: 0.15, transmission: 0.6, thickness: 0.3, transparent: true, opacity: 0.85 });
-    const shade = new THREE.MeshStandardMaterial({ color: "#1d3a2a", roughness: 0.45, metalness: 0.6 });
-    const bulb = new THREE.MeshStandardMaterial({ color: "#fff0d0", emissive: new THREE.Color("#ffcf8a"), emissiveIntensity: 4, toneMapped: false });
+    const shade = new THREE.MeshStandardMaterial({ color: "#2b2119", roughness: 0.42, metalness: 0.75 });
+    const bulb = new THREE.MeshStandardMaterial({
+      color: "#fff6e2",
+      emissive: new THREE.Color("#ffdcae"),
+      emissiveIntensity: 6,
+      toneMapped: false,
+    });
     const felt = new THREE.MeshStandardMaterial({ color: "#1e7a52", roughness: 0.92, metalness: 0.02 });
     const cabinet = new THREE.MeshStandardMaterial({ color: "#241a2c", roughness: 0.42, metalness: 0.35 });
     const neon = new THREE.MeshStandardMaterial({ color: "#ff2d55", emissive: new THREE.Color("#ff2d55"), emissiveIntensity: 4, toneMapped: false });
@@ -204,14 +209,35 @@ export function HallFront() {
         <color attach="background" args={["#070506"]} />
         <fog attach="fog" args={["#0a0705", 16, 34]} />
 
-        <ambientLight intensity={0.75} color="#ffe3c8" />
-        <pointLight position={[-4.4, 2.6, 3]} intensity={34} color="#ffcf9a" distance={14} decay={2} />
-        <pointLight position={[0, 2.6, 0.6]} intensity={34} color="#ffcf9a" distance={13} decay={2} />
-        <pointLight position={[4.4, 2.6, 3]} intensity={34} color="#ffcf9a" distance={14} decay={2} />
-        <pointLight position={[-5, 2.2, 6.4]} intensity={4} color="#ff4d5e" distance={8} decay={2} />
-        <pointLight position={[5, 2.2, 6.4]} intensity={6} color="#22e0ff" distance={8} decay={2} />
-        <pointLight position={[6.2, 1.6, 3.2]} intensity={8} color="#ffb066" distance={5} decay={2} />
-        <pointLight position={[7.5, 3.2, 7.5]} intensity={12} color="#8fc6ff" distance={12} decay={2} />
+        {/* One pendant over each machine, and the light comes from those bulbs. A low
+            ambient keeps the far corners from going black without inventing a source. */}
+        <ambientLight intensity={0.34} color="#ffe0c6" />
+        {[
+          [-6.4, 3.2],
+          [0, 1.4],
+          [6.2, 3.2],
+        ].map(([x, z], i) => (
+          <group key={`lamp-${i}`}>
+            <spotLight
+              position={[x, 3.3, z]}
+              angle={0.85}
+              penumbra={0.75}
+              intensity={110}
+              color="#ffd9a6"
+              distance={14}
+              decay={2}
+              target-position={[x, 0.9, z]}
+            />
+            <pointLight position={[x, 3.2, z]} intensity={6} color="#ffd9a6" distance={4} decay={2} />
+          </group>
+        ))}
+
+        {/* The lit strips under the back-bar shelves, as light rather than decoration. */}
+        <pointLight position={[-2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7.5} decay={2} />
+        <pointLight position={[2.6, 2.1, 7.4]} intensity={9} color="#ffc07a" distance={7} decay={2} />
+
+        {/* The neon's own spill, not a lamp. */}
+        <pointLight position={[4.9, 2.6, 7.6]} intensity={6} color="#ff2d55" distance={7} decay={2} />
 
         <Hall />
 
