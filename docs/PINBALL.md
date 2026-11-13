@@ -137,14 +137,44 @@ art can improve without the physics drifting.
 
 ---
 
+## 6b. The cabinet and the walls
+
+Everything on the table is either traced from artwork or modelled in Blender.
+
+**Cabinet:** body, apron, four legs with feet and levellers, and a backbox with its lid
+standing open. The wooden frame around the playfield is one **mitered ring**
+(`art/build_cabinet_frame.py`), not four rails, so the corners join.
+
+**Walls:** six of them, all from `art/build_table_walls.py`, which writes both the mesh
+and `web/lib/pinball/table-walls.json`. Every junction is a named point
+(`NEAR_LEFT`, `HEAD_START`, `LANE_RAIL_END`, `FAR`, …) and each wall is a pair of those
+points, so moving a junction moves both walls that touch it and nothing else.
+
+**Playfield objects**
+
+| Object | Behaviour |
+|---|---|
+| 5 bells | kick, flash with a real light burst, chain multiplier |
+| 2 arm plates | boost on contact, random direction, visible pulse |
+| top bumper | solid, three colliders traced from its artwork |
+| 2 chevrons | fire the ball out to their own side at 2.8 m/s |
+| 3 lane arrows | blink red/blue up the shooter lane |
+| drop targets, rings, posts | score and deflect |
+
+**Physics rules that matter**
+
+- bells are spheres, so nothing can rest on them; the ball is moved clear before a kick
+- trigger radii include the ball's radius, so a fast ball cannot step over a trigger
+- the ball speed is capped at 5.2 m/s and a stalled ball is nudged after 0.75 s
+- the `EventQueue` belongs to its world; handing a freed queue to a new world corrupts
+  wasm, which is what produced the `memory access out of bounds` crashes
+
 ## 7. Known issues
 
 1. **Arm colliders are straight.** The funnels under the bent arms are two boxes, so a
    ball rolling the wall can cut the corner inside the visible black arm.
-2. **Spinners do not react.** They turn on a timer, not on contact.
 3. **Drop targets never reset**, and clearing the bank does nothing.
-4. **The saucer pays but does not hold** the ball.
-5. **No sound.**
+4. **No sound.**
 6. **Chain tuning is guesswork**: 2.6 s decay may be too short or too long.
 7. **Debug hooks** (`__pin`, `__place`, `__kick`, `__flip`, `__near`, `__at`, `__ghost`)
    ship in the bundle.
